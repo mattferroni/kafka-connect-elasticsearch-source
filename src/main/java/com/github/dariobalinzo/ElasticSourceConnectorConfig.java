@@ -29,26 +29,25 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
 
     //TODO add the possibility to specify multiple hosts
     public final static String ES_HOST_CONF = "es.host";
-    private final static String ES_HOST_DOC = "ElasticSearch host";
-    private final static String ES_HOST_DISPLAY = "Elastic host";
-
+    private final static String ES_HOST_DOC = "ElasticSearch host.";
+    private final static String ES_HOST_DISPLAY = "ElasticSearch host";
 
     public final static String ES_PORT_CONF = "es.port";
-    private final static String ES_PORT_DOC = "ElasticSearch port";
+    private final static String ES_PORT_DOC = "ElasticSearch port.";
     private final static String ES_PORT_DISPLAY = "ElasticSearch port";
 
     public final static String ES_USER_CONF = "es.user";
-    private final static String ES_USER_DOC = "Elasticsearch username";
-    private final static String ES_USER_DISPLAY = "Elasticsearch username";
+    private final static String ES_USER_DOC = "ElasticSearch username.";
+    private final static String ES_USER_DISPLAY = "ElasticSearch username";
 
     public final static String ES_PWD_CONF = "es.password";
-    private final static String ES_PWD_DOC = "Elasticsearch password";
-    private final static String ES_PWD_DISPLAY = "Elasticsearch password";
+    private final static String ES_PWD_DOC = "ElasticSearch password.";
+    private final static String ES_PWD_DISPLAY = "ElasticSearch password";
 
     public static final String CONNECTION_ATTEMPTS_CONFIG = "connection.attempts";
     private static final String CONNECTION_ATTEMPTS_DOC
-            = "Maximum number of attempts to retrieve a valid Elasticsearch connection.";
-    private static final String CONNECTION_ATTEMPTS_DISPLAY = "Elasticsearch connection attempts";
+            = "Maximum number of attempts to retrieve a valid ElasticSearch connection.";
+    private static final String CONNECTION_ATTEMPTS_DISPLAY = "ElasticSearch connection attempts";
     private static final String CONNECTION_ATTEMPTS_DEFAULT = "3";
 
     public static final String CONNECTION_BACKOFF_CONFIG = "connection.backoff.ms";
@@ -67,19 +66,26 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
     public static final String BATCH_MAX_ROWS_CONFIG = "batch.max.rows";
     private static final String BATCH_MAX_ROWS_DOC =
             "Maximum number of documents to include in a single batch when polling for new data.";
-    private static final String BATCH_MAX_ROWS_DEFAULT = "10000";
+    private static final String BATCH_MAX_ROWS_DEFAULT = "1000";
     private static final String BATCH_MAX_ROWS_DISPLAY = "Max Documents Per Batch";
 
-    private static final String MODE_UNSPECIFIED = "";
-    private static final String MODE_BULK = "bulk";
-    private static final String MODE_TIMESTAMP = "timestamp";
-    private static final String MODE_INCREMENTING = "incrementing";
-    private static final String MODE_TIMESTAMP_INCREMENTING = "timestamp+incrementing";
+    public static final String MODE_UNSPECIFIED = "";
+    public static final String MODE_BULK = "bulk";
+    public static final String MODE_TIMESTAMP = "timestamp";
+    public static final String MODE_INCREMENTING = "incrementing";
+    public static final String MODE_TIMESTAMP_INCREMENTING = "timestamp+incrementing";
+
+    public static final String MODE_CONFIG = "mode";
+    private static final String MODE_DOC = "The mode for updating a table each time it is polled. " +
+            "Now supporting only " + MODE_INCREMENTING + " mode: use a strictly incrementing column " +
+            "on each table to detect only new rows. Note that this will not detect modifications or " +
+            "deletions of existing rows";
+    private static final String MODE_DISPLAY = "Index loading mode";
 
     public static final String INCREMENTING_FIELD_NAME_CONFIG = "incrementing.field.name";
     private static final String INCREMENTING_FIELD_NAME_DOC =
             "The name of the strictly incrementing field to use to detect new records.";
-    private static final String INCREMENTING_FIELD_NAME_DEFAULT = "";
+    private static final String INCREMENTING_FIELD_NAME_DEFAULT = "timestamp";
     private static final String INCREMENTING_FIELD_NAME_DISPLAY = "Incrementing Field Name";
 
     public static final String INDEX_PREFIX_CONFIG = "index.prefix";
@@ -87,21 +93,14 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
     private static final String INDEX_PREFIX_DEFAULT = "";
     private static final String INDEX_PREFIX_DISPLAY = "Indices prefix Whitelist";
 
-
     public static final String TOPIC_PREFIX_CONFIG = "topic.prefix";
     private static final String TOPIC_PREFIX_DOC =
-            "Prefix to prepend to index names to generate the name of the Kafka topic to publish data";
+            "Prefix to prepend to index names to generate the name of the Kafka topic to publish data.";
     private static final String TOPIC_PREFIX_DISPLAY = "Topic Prefix";
 
-    private static final String DATABASE_GROUP = "Elasticsearch";
+    private static final String DATABASE_GROUP = "ElasticSearch";
     private static final String MODE_GROUP = "Mode";
     private static final String CONNECTOR_GROUP = "Connector";
-
-    private static final String MODE_CONFIG = "mode";
-    private static final String MODE_DOC = "";
-    private static final String MODE_DISPLAY = "Index Incrementing field";
-
-    public static final String INDICES_CONFIG = "es.indices";
 
 
     public static final ConfigDef CONFIG_DEF = baseConfigDef();
@@ -165,7 +164,7 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
                 CONNECTION_ATTEMPTS_DOC,
                 DATABASE_GROUP,
                 ++orderInGroup,
-                ConfigDef.Width.SHORT,
+                Width.SHORT,
                 CONNECTION_ATTEMPTS_DISPLAY
         ).define(
                 CONNECTION_BACKOFF_CONFIG,
