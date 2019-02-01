@@ -16,14 +16,11 @@
 
 package com.github.dariobalinzo.elasticsearch;
 
-import com.github.dariobalinzo.ElasticSourceConnectorConfig;
-import com.github.dariobalinzo.utils.Utils;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.kafka.common.protocol.types.Field;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.ShardSearchFailure;
@@ -32,6 +29,8 @@ import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.SortOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +41,8 @@ import java.io.InputStreamReader;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
 
 public class ElasticsearchDAO {
 
@@ -184,24 +185,57 @@ public class ElasticsearchDAO {
     }
 
 
+    /**
+     * Start a scroll query that ranges from the last value of
+     * incrementingFieldName, expecting maximum batchMaxRows items per request
+     *
+     * @param index
+     * @param incrementingFieldName
+     * @param incrementingFieldLastValue
+     * @param batchMaxRows
+     * @return
+     * @throws IOException
+     */
+    public ElasticsearchScrollResponse startScroll(String index, String incrementingFieldName, String incrementingFieldLastValue, int batchMaxRows) throws IOException {
+        final SearchRequest searchRequest = new SearchRequest(index);
+        searchRequest.scroll(SCROLL_KEEP_ALIVE);
+        final SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(
+                rangeQuery(incrementingFieldName)
+                        .from(incrementingFieldLastValue, true) // TODO: what is last here? are we introducing duplicates?
+        )
+                .sort(incrementingFieldName, SortOrder.ASC)
+                .size(batchMaxRows);
+        searchRequest.source(searchSourceBuilder);
 
+        SearchResponse searchResponse = retryOnFailure(() -> {
+            logger.debug("Executing request on index: {}, field name: {}, last value: {} - Complete request: {}", index, incrementingFieldName, incrementingFieldLastValue, searchRequest);
+            final SearchResponse response = client.search(searchRequest);
+            if (response == null) {
+                throw new IOException("Null response received from ElasticSearch client");
+            }
 
+            final SearchHits hits = response.getHits();
+            final int totalShards = response.getTotalShards();
+            final int successfulShards = response.getSuccessfulShards();
+            logger.debug("Total shard: {} - Successful: {} - Hits: {}", totalShards, successfulShards, hits.totalHits);
 
+            int failedShards = response.getFailedShards();
+            if (failedShards > 0) {
+                for (ShardSearchFailure failure : response.getShardFailures()) {
+                    logger.error("Failed shards information: {}", failure);
+                }
+                // TODO: better handle shard failures
+                throw new RuntimeException("failed shard in search");
+            }
 
+            return response;
+        });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+        final ElasticsearchScrollResponse response = new ElasticsearchScrollResponse(searchResponse.getHits(), searchResponse.getScrollId());
+        logger.info("ElasticsearchScrollResponse: {}", response);
+        return response;
+    }
 
 
     public SearchResponse performSearchRequest(SearchRequest searchRequest) throws IOException {
@@ -258,17 +292,6 @@ public class ElasticsearchDAO {
         throw new IOException(String.format("Failed %s connection attempts (every %s ms) - limit reached", maxConnectionAttempts, connectionRetryBackoff));
     }
 
-    /**
-     * Whatever action we might want to retry for a certain number of times
-     *
-     * @param <R>
-     * @param <E>
-     */
-    protected interface ElasticsearhRetriableAction<R,E extends IOException> {
-        public R apply() throws E;
-    }
-
-
     public static void main(String[] args) throws IOException {
         String host = "localhost";
         int port = 9200;
@@ -282,12 +305,15 @@ public class ElasticsearchDAO {
 
         logger.info("All indices available: {}", dao.getIndices());
 
-        logger.info("All indices matching '{}': {}", prefix, dao.getIndicesMatching(prefix));
+        final List<String> indices = dao.getIndicesMatching(prefix);
+        logger.info("All indices matching '{}': {}", prefix, indices);
+
+        final String index = indices.get(0);
+        logger.info("Scroll query from beginning: {}", dao.startScroll(index, "creationDate", "0", 100));
 
         logger.info("Closing client...");
         dao.closeQuietly();
         logger.info("Client closed");
-
 
     }
 
