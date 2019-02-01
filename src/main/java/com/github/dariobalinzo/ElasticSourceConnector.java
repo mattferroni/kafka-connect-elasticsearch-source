@@ -18,7 +18,7 @@ package com.github.dariobalinzo;
 
 import com.github.dariobalinzo.task.ElasticSourceTask;
 import com.github.dariobalinzo.task.ElasticSourceTaskConfig;
-import com.github.dariobalinzo.utils.ElasticSearchDataProvider;
+import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
 import com.github.dariobalinzo.utils.Utils;
 import com.github.dariobalinzo.utils.Version;
 import org.apache.kafka.common.config.ConfigDef;
@@ -53,7 +53,7 @@ public class ElasticSourceConnector extends SourceConnector {
      * otherwise we might consider the possibility to close this connection after startup
      * and reopening it when re-assigning tasks (e.g., on rebalancing)
      */
-    private ElasticSearchDataProvider elasticConnectionProvider;
+    private ElasticsearchDAO elasticDAO;
 
     @Override
     public String version() {
@@ -72,8 +72,8 @@ public class ElasticSourceConnector extends SourceConnector {
                     + "error", e);
         }
 
-        elasticConnectionProvider = Utils.initElasticConnectionProvider(config);
-        if (!elasticConnectionProvider.testConnection()) {
+        elasticDAO = Utils.initElasticConnectionProvider(config);
+        if (!elasticDAO.testConnection()) {
             throw new ConfigException("Cannot connect to ElasticSearch");
         }
 
@@ -88,20 +88,14 @@ public class ElasticSourceConnector extends SourceConnector {
     @Override
     public List<Map<String, String>> taskConfigs(int maxTasks) {
 
-        Response resp;
+        List<String> currentIndexes;
         try {
-            // FIXME: wrap this HTTP call in a safer place, with retries and versioned endpoint
-            resp = elasticConnectionProvider.getClient()
-                    .getLowLevelClient()
-                    .performRequest("GET", "_cat/indices");
-        } catch (IOException e) {
-            logger.error("Cannot get index names from ElasticSearch");
+            currentIndexes = elasticDAO.getIndicesMatching(
+                    config.getString(ElasticSourceConnectorConfig.INDEX_PREFIX_CONFIG));
+        } catch (Exception e) {
+            logger.error("Unable to retrieve indices from Elasticsearch", e);
             throw new RuntimeException(e);
         }
-
-        List<String> currentIndexes = Utils.parseAndSelectIndices(resp,
-                config.getString(ElasticSourceConnectorConfig.INDEX_PREFIX_CONFIG)
-        );
 
         int numGroups = Math.min(currentIndexes.size(), maxTasks);
         List<List<String>> tablesGrouped = ConnectorUtils.groupPartitions(currentIndexes, numGroups);
@@ -121,7 +115,7 @@ public class ElasticSourceConnector extends SourceConnector {
     @Override
     public void stop() {
         logger.info("Closing ElasticSearch connection");
-        elasticConnectionProvider.closeQuietly();
+        elasticDAO.closeQuietly();
         // TODO: in case we implemented an indices monitoring thread, stop it here
         logger.info("ElasticSearch connection closed");
     }
