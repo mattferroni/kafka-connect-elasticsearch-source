@@ -39,7 +39,9 @@ public class Utils {
     public static final String FILENAME_FIELD = "elasticsource-filename-field";
     public static final String POSITION_FIELD = "elasticsource-position-field";
 
-    public static ElasticsearchDAO initElasticConnectionProvider(final ElasticSourceConnectorConfig config) {
+    public static ElasticsearchDAO initElasticsearchDAO(
+            final ElasticSourceConnectorConfig config
+    ) {
         final String esHost = config.getString(ElasticSourceConnectorConfig.ES_HOST_CONF);
         final int esPort = Integer.parseInt(config.getString(ElasticSourceConnectorConfig.ES_PORT_CONF));
 

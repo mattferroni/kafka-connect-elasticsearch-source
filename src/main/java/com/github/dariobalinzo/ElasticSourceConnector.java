@@ -16,6 +16,7 @@
 
 package com.github.dariobalinzo;
 
+import com.github.dariobalinzo.task.ElasticSourceTask;
 import com.github.dariobalinzo.task.ElasticSourceTaskConfig;
 import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
 import com.github.dariobalinzo.utils.Utils;
@@ -35,8 +36,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * ElasticSourceConnector is a Kafka Connect Connector implementation that watches an Elasticsearch index and
- * generates tasks to ingest its content.
+ * ElasticSourceConnector is a Kafka Connect Connector implementation that watches an Elasticsearch
+ * index and generates tasks to ingest its content.
  */
 public class ElasticSourceConnector extends SourceConnector {
 
@@ -65,11 +66,11 @@ public class ElasticSourceConnector extends SourceConnector {
             configProperties = props;
             config = new ElasticSourceConnectorConfig(props);
         } catch (ConfigException e) {
-            throw new ConnectException("Couldn't start ElasticSourceConnector due to configuration "
+            throw new ConfigException("Couldn't start ElasticSourceConnector due to configuration "
                     + "error", e);
         }
 
-        elasticDAO = Utils.initElasticConnectionProvider(config);
+        elasticDAO = Utils.initElasticsearchDAO(config);
         if (!elasticDAO.testConnection()) {
             throw new ConnectException("Cannot connect to Elasticsearch");
         }
@@ -79,8 +80,7 @@ public class ElasticSourceConnector extends SourceConnector {
 
     @Override
     public Class<? extends Task> taskClass() {
-        // return ElasticSourceTask.class;
-        return Task.class;
+        return ElasticSourceTask.class;
     }
 
     @Override
