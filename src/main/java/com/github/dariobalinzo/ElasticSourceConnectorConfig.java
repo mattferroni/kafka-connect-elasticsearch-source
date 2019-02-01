@@ -29,25 +29,25 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
 
     //TODO add the possibility to specify multiple hosts
     public final static String ES_HOST_CONF = "es.host";
-    private final static String ES_HOST_DOC = "ElasticSearch host.";
-    private final static String ES_HOST_DISPLAY = "ElasticSearch host";
+    private final static String ES_HOST_DOC = "Elasticsearch host.";
+    private final static String ES_HOST_DISPLAY = "Elasticsearch host";
 
     public final static String ES_PORT_CONF = "es.port";
-    private final static String ES_PORT_DOC = "ElasticSearch port.";
-    private final static String ES_PORT_DISPLAY = "ElasticSearch port";
+    private final static String ES_PORT_DOC = "Elasticsearch port.";
+    private final static String ES_PORT_DISPLAY = "Elasticsearch port";
 
     public final static String ES_USER_CONF = "es.user";
-    private final static String ES_USER_DOC = "ElasticSearch username.";
-    private final static String ES_USER_DISPLAY = "ElasticSearch username";
+    private final static String ES_USER_DOC = "Elasticsearch username.";
+    private final static String ES_USER_DISPLAY = "Elasticsearch username";
 
     public final static String ES_PWD_CONF = "es.password";
-    private final static String ES_PWD_DOC = "ElasticSearch password.";
-    private final static String ES_PWD_DISPLAY = "ElasticSearch password";
+    private final static String ES_PWD_DOC = "Elasticsearch password.";
+    private final static String ES_PWD_DISPLAY = "Elasticsearch password";
 
     public static final String CONNECTION_ATTEMPTS_CONFIG = "connection.attempts";
     private static final String CONNECTION_ATTEMPTS_DOC
-            = "Maximum number of attempts to retrieve a valid ElasticSearch connection.";
-    private static final String CONNECTION_ATTEMPTS_DISPLAY = "ElasticSearch connection attempts";
+            = "Maximum number of attempts to retrieve a valid Elasticsearch connection.";
+    private static final String CONNECTION_ATTEMPTS_DISPLAY = "Elasticsearch connection attempts";
     private static final String CONNECTION_ATTEMPTS_DEFAULT = "3";
 
     public static final String CONNECTION_BACKOFF_CONFIG = "connection.backoff.ms";
@@ -98,7 +98,7 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
             "Prefix to prepend to index names to generate the name of the Kafka topic to publish data.";
     private static final String TOPIC_PREFIX_DISPLAY = "Topic Prefix";
 
-    private static final String DATABASE_GROUP = "ElasticSearch";
+    private static final String DATABASE_GROUP = "Elasticsearch";
     private static final String MODE_GROUP = "Mode";
     private static final String CONNECTOR_GROUP = "Connector";
 

@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * ElasticSourceConnector is a Kafka Connect Connector implementation that watches an ElasticSearch index and
+ * ElasticSourceConnector is a Kafka Connect Connector implementation that watches an Elasticsearch index and
  * generates tasks to ingest its content.
  */
 public class ElasticSourceConnector extends SourceConnector {
@@ -59,7 +59,7 @@ public class ElasticSourceConnector extends SourceConnector {
 
     @Override
     public void start(Map<String, String> props) {
-        logger.info("Starting ElasticSearch Source Connector");
+        logger.info("Starting Elasticsearch Source Connector");
 
         try {
             configProperties = props;
@@ -71,10 +71,10 @@ public class ElasticSourceConnector extends SourceConnector {
 
         elasticDAO = Utils.initElasticConnectionProvider(config);
         if (!elasticDAO.testConnection()) {
-            throw new ConfigException("Cannot connect to ElasticSearch");
+            throw new ConnectException("Cannot connect to Elasticsearch");
         }
 
-        logger.debug("ElasticSearch");
+        logger.debug("Successfully connected to Elasticsearch");
     }
 
     @Override
@@ -112,10 +112,10 @@ public class ElasticSourceConnector extends SourceConnector {
 
     @Override
     public void stop() {
-        logger.info("Closing ElasticSearch connection");
+        logger.info("Closing Elasticsearch connection");
         elasticDAO.closeQuietly();
         // TODO: in case we implemented an indices monitoring thread, stop it here
-        logger.info("ElasticSearch connection closed");
+        logger.info("Elasticsearch connection closed");
     }
 
     @Override

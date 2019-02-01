@@ -69,7 +69,7 @@ public class ElasticsearchDAO {
             int maxConnectionAttempts,
             long connectionRetryBackoff
     ) {
-        logger.debug("Connecting to ElasticSearch (no authentication)");
+        logger.debug("Connecting to Elasticsearch (no authentication)");
 
         //TODO add configuration for https also, and many nodes instead of only one
         client = new RestHighLevelClient(
@@ -98,7 +98,7 @@ public class ElasticsearchDAO {
             int maxConnectionAttempts,
             long connectionRetryBackoff
     ) {
-        logger.debug("Connecting to ElasticSearch (with authentication)");
+        logger.debug("Connecting to Elasticsearch (with authentication)");
 
         final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
         credentialsProvider.setCredentials(AuthScope.ANY,
@@ -156,8 +156,10 @@ public class ElasticsearchDAO {
         return retryOnFailure(() -> {
             final List<String> result = new LinkedList<>();
 
-            final Response response = client.getLowLevelClient()
-                    .performRequest("GET", "_cat/indices");
+            final Response response = retryOnFailure(() -> {
+                return client.getLowLevelClient()
+                        .performRequest("GET", "_cat/indices");
+            });
 
             final InputStream rawResponse = response.getEntity().getContent();
             final BufferedReader reader = new BufferedReader(new InputStreamReader(rawResponse));
@@ -249,24 +251,6 @@ public class ElasticsearchDAO {
         SearchResponse searchResponse = retryOnFailure(() -> {
             logger.debug("Executing request on index: {}, field name: {}, last value: {} - Complete request: {}", index, incrementingFieldName, incrementingFieldLastValue, searchRequest);
             final SearchResponse response = client.search(searchRequest);
-            if (response == null) {
-                throw new IOException("Null response received from ElasticSearch client");
-            }
-
-            final SearchHits hits = response.getHits();
-            final int totalShards = response.getTotalShards();
-            final int successfulShards = response.getSuccessfulShards();
-            logger.debug("Total shard: {} - Successful: {} - Total hits: {} - Current hits: {}", totalShards, successfulShards, hits.totalHits, hits.getHits().length);
-
-            int failedShards = response.getFailedShards();
-            if (failedShards > 0) {
-                for (ShardSearchFailure failure : response.getShardFailures()) {
-                    logger.error("Failed shards information: {}", failure);
-                }
-                // TODO: better handle shard failures
-                throw new RuntimeException("failed shard in search");
-            }
-
             return response;
         });
 
@@ -335,7 +319,7 @@ public class ElasticsearchDAO {
 
                 if (response instanceof SearchResponse) {
                     if (response == null) {
-                        throw new IOException("Null response received from ElasticSearch client");
+                        throw new IOException("Null response received from Elasticsearch client");
                     }
 
                     final SearchHits hits = ((SearchResponse) response).getHits();
@@ -355,7 +339,7 @@ public class ElasticsearchDAO {
 
                 return response;
             } catch (IOException e) {
-                logger.warn("Connection problems with ElasticSearch (attempt: {}) - Trying again in {} ms...", i, connectionRetryBackoff, e);
+                logger.warn("Connection problems with Elasticsearch (attempt: {}) - Trying again in {} ms...", i, connectionRetryBackoff, e);
             }
 
             try {
