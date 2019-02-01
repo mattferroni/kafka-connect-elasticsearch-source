@@ -16,7 +16,6 @@
 
 package com.github.dariobalinzo;
 
-import com.github.dariobalinzo.task.ElasticSourceTask;
 import com.github.dariobalinzo.task.ElasticSourceTaskConfig;
 import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
 import com.github.dariobalinzo.utils.Utils;
@@ -27,11 +26,9 @@ import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.source.SourceConnector;
 import org.apache.kafka.connect.util.ConnectorUtils;
-import org.elasticsearch.client.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -82,7 +79,8 @@ public class ElasticSourceConnector extends SourceConnector {
 
     @Override
     public Class<? extends Task> taskClass() {
-        return ElasticSourceTask.class;
+        // return ElasticSourceTask.class;
+        return Task.class;
     }
 
     @Override

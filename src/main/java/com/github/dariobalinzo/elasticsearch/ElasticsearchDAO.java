@@ -67,7 +67,7 @@ public class ElasticsearchDAO {
             int maxConnectionAttempts,
             long connectionRetryBackoff
     ) {
-        logger.info("Connecting to ElasticSearch (no authentication)");
+        logger.debug("Connecting to ElasticSearch (no authentication)");
 
         //TODO add configuration for https also, and many nodes instead of only one
         client = new RestHighLevelClient(
@@ -96,7 +96,7 @@ public class ElasticsearchDAO {
             int maxConnectionAttempts,
             long connectionRetryBackoff
     ) {
-        logger.info("Connecting to ElasticSearch (with authentication)");
+        logger.debug("Connecting to ElasticSearch (with authentication)");
 
         final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
         credentialsProvider.setCredentials(AuthScope.ANY,
@@ -269,7 +269,7 @@ public class ElasticsearchDAO {
     }
 
 
-    static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException {
         String host = "localhost";
         int port = 9200;
         int maxConnectionAttempts = 5;

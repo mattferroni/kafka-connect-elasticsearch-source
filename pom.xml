@@ -24,6 +24,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <connect.version>2.1.0</connect.version>
         <elastic.version>6.2.3</elastic.version>
+        <log4j.version>2.11.1</log4j.version>
     </properties>
 
     <groupId>com.github.dariobalinzo</groupId>
@@ -63,6 +64,14 @@
             <version>4.12</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- Logs -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+
     </dependencies>
 
 
