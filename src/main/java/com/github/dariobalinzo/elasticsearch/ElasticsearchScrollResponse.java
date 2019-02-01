@@ -4,8 +4,8 @@ import org.elasticsearch.search.SearchHits;
 
 public class ElasticsearchScrollResponse {
 
-    final SearchHits hits;
-    final String scrollId;
+    private final SearchHits hits;
+    private final String scrollId;
 
     public ElasticsearchScrollResponse(SearchHits hits, String scrollId) {
         this.hits = hits;

@@ -21,13 +21,13 @@ import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.action.search.ShardSearchFailure;
+import org.elasticsearch.ElasticsearchStatusException;
+import org.elasticsearch.action.search.*;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.SortOrder;
@@ -40,9 +40,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
+import static org.elasticsearch.index.query.QueryBuilders.*;
 
 public class ElasticsearchDAO {
 
@@ -116,7 +117,7 @@ public class ElasticsearchDAO {
     }
 
     /**
-     * Test if the connection is valid, with retrying logic
+     * Test if the connection is valid
      *
      * @return
      */
@@ -146,7 +147,7 @@ public class ElasticsearchDAO {
     }
 
     /**
-     * Get all indices found on Elasticsearch, with retrying logic
+     * Get all indices found on Elasticsearch
      *
      * @return
      * @throws IOException
@@ -171,7 +172,7 @@ public class ElasticsearchDAO {
     }
 
     /**
-     * Get all indices that matches a certain prefix, with retrying logic
+     * Get all indices that matches a certain prefix
      *
      * @param prefix
      * @return
@@ -184,6 +185,42 @@ public class ElasticsearchDAO {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Get the first (oldest) value in the index for a given field; it might
+     * return an empty result if no documents are present or the field do not
+     * exist.
+     *
+     * @param index
+     * @param incrementingFieldName
+     * @return
+     * @throws IOException
+     */
+    public Optional<String> getFirstValue(String index, String incrementingFieldName) throws IOException {
+        final SearchRequest searchRequest = new SearchRequest(index);
+        final SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(
+                matchAllQuery()
+        )
+                .sort(incrementingFieldName, SortOrder.ASC)
+                .size(1);
+        searchRequest.source(searchSourceBuilder);
+
+        SearchResponse searchResponse = retryOnFailure(() -> {
+            logger.debug("Get first value of field: {} on index: {} - Complete request: {}", incrementingFieldName, index, searchRequest);
+            final SearchResponse response = client.search(searchRequest);
+            return response;
+        });
+
+        final SearchHit[] hits = searchResponse.getHits().getHits();
+        if (hits.length == 1 && hits[0].getSourceAsMap().containsKey(incrementingFieldName)) {
+            final String firstValue = hits[0].getSourceAsMap().get(incrementingFieldName).toString();
+            logger.debug("First value found for : {} -> {}", incrementingFieldName, firstValue);
+            return Optional.of(firstValue);
+        } else {
+            logger.warn("No first value found for field: {} - Complete response: {}", incrementingFieldName, searchResponse);
+            return Optional.empty();
+        }
+    }
 
     /**
      * Start a scroll query that ranges from the last value of
@@ -192,17 +229,18 @@ public class ElasticsearchDAO {
      * @param index
      * @param incrementingFieldName
      * @param incrementingFieldLastValue
+     * @param includeLower
      * @param batchMaxRows
      * @return
      * @throws IOException
      */
-    public ElasticsearchScrollResponse startScroll(String index, String incrementingFieldName, String incrementingFieldLastValue, int batchMaxRows) throws IOException {
+    public ElasticsearchScrollResponse startScroll(String index, String incrementingFieldName, String incrementingFieldLastValue, boolean includeLower, int batchMaxRows) throws IOException {
         final SearchRequest searchRequest = new SearchRequest(index);
         searchRequest.scroll(SCROLL_KEEP_ALIVE);
         final SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(
                 rangeQuery(incrementingFieldName)
-                        .from(incrementingFieldLastValue, true) // TODO: what is last here? are we introducing duplicates?
+                        .from(incrementingFieldLastValue, includeLower)
         )
                 .sort(incrementingFieldName, SortOrder.ASC)
                 .size(batchMaxRows);
@@ -218,7 +256,7 @@ public class ElasticsearchDAO {
             final SearchHits hits = response.getHits();
             final int totalShards = response.getTotalShards();
             final int successfulShards = response.getSuccessfulShards();
-            logger.debug("Total shard: {} - Successful: {} - Hits: {}", totalShards, successfulShards, hits.totalHits);
+            logger.debug("Total shard: {} - Successful: {} - Total hits: {} - Current hits: {}", totalShards, successfulShards, hits.totalHits, hits.getHits().length);
 
             int failedShards = response.getFailedShards();
             if (failedShards > 0) {
@@ -237,32 +275,48 @@ public class ElasticsearchDAO {
         return response;
     }
 
+    /**
+     * Continue scroll query, given its id
+     *
+     * @param scrollId
+     * @return
+     * @throws IOException
+     */
+    public ElasticsearchScrollResponse continueScroll(final String scrollId) throws IOException {
+        final SearchScrollRequest scrollRequest = new SearchScrollRequest(scrollId);
+        scrollRequest.scroll(SCROLL_KEEP_ALIVE);
 
-    public SearchResponse performSearchRequest(SearchRequest searchRequest) throws IOException {
-        return retryOnFailure(() -> {
-            SearchResponse response = client.search(searchRequest);
-            if (response == null) {
-                throw new RuntimeException("Null response received from ElasticSearch client");
-            }
-
-            SearchHits hits = response.getHits();
-            int totalShards = response.getTotalShards();
-            int successfulShards = response.getSuccessfulShards();
-            logger.info("Total shard: {} - Successful: {} - Hits: {}", totalShards, successfulShards, hits.totalHits);
-
-            int failedShards = response.getFailedShards();
-            if (failedShards > 0) {
-                for (ShardSearchFailure failure : response.getShardFailures()) {
-                    logger.error("Failed shards information: {}", failure);
-                }
-                // TODO: better handle shard failures
-                throw new RuntimeException("failed shard in search");
-            }
-
+        SearchResponse searchResponse = retryOnFailure(() -> {
+            logger.debug("Continue scroll with id: {} - Complete request: {}", scrollId, scrollRequest);
+            final SearchResponse response = client.searchScroll(scrollRequest);
             return response;
         });
+
+        final ElasticsearchScrollResponse response = new ElasticsearchScrollResponse(searchResponse.getHits(), searchResponse.getScrollId());
+        logger.info("ElasticsearchScrollResponse: {}", response);
+        return response;
     }
 
+    /**
+     * Close an ongoing scroll
+     *
+     * @param scrollId
+     */
+    public void closeScrollQuietly(String scrollId) throws IOException {
+        final ClearScrollRequest clearScrollRequest = new ClearScrollRequest();
+        clearScrollRequest.addScrollId(scrollId);
+
+        ClearScrollResponse clearScrollResponse = retryOnFailure(() -> {
+            return client.clearScroll(clearScrollRequest);
+        });
+
+        boolean succeeded = clearScrollResponse != null && clearScrollResponse.isSucceeded();
+        if (succeeded) {
+            logger.debug("Gracefully closed scroll request with id: {}", scrollId);
+        } else {
+            logger.warn("Error closing scroll request with id: {}", scrollId);
+        }
+    }
 
     /**
      * Wrapper method that encapsulate retrying logic
@@ -277,7 +331,29 @@ public class ElasticsearchDAO {
     protected <R,E extends IOException> R retryOnFailure(ElasticsearhRetriableAction<R,E> action) throws E, IOException {
         for (int i = 0; i < maxConnectionAttempts; ++i) {
             try {
-                return action.apply();
+                R response = action.apply();
+
+                if (response instanceof SearchResponse) {
+                    if (response == null) {
+                        throw new IOException("Null response received from ElasticSearch client");
+                    }
+
+                    final SearchHits hits = ((SearchResponse) response).getHits();
+                    final int totalShards = ((SearchResponse) response).getTotalShards();
+                    final int successfulShards = ((SearchResponse) response).getSuccessfulShards();
+                    logger.debug("Total shard: {} - Successful: {} - Total hits: {} - Current hits: {}", totalShards, successfulShards, hits.totalHits, hits.getHits().length);
+
+                    int failedShards = ((SearchResponse) response).getFailedShards();
+                    if (failedShards > 0) {
+                        for (ShardSearchFailure failure : ((SearchResponse) response).getShardFailures()) {
+                            logger.error("Failed shards information: {}", failure);
+                        }
+                        // TODO: better handle shard failures
+                        throw new IOException("Failed shard in search");
+                    }
+                }
+
+                return response;
             } catch (IOException e) {
                 logger.warn("Connection problems with ElasticSearch (attempt: {}) - Trying again in {} ms...", i, connectionRetryBackoff, e);
             }
@@ -292,12 +368,23 @@ public class ElasticsearchDAO {
         throw new IOException(String.format("Failed %s connection attempts (every %s ms) - limit reached", maxConnectionAttempts, connectionRetryBackoff));
     }
 
+    /**
+     * Simple tests for local debugging
+     *
+     * TODO: make these real tests!
+     *
+     * @param args
+     * @throws IOException
+     */
     public static void main(String[] args) throws IOException {
         String host = "localhost";
         int port = 9200;
         int maxConnectionAttempts = 5;
         long connectionRetryBackoff = 1000;
-        String prefix = "jago_prod";
+        int batchMaxRow = 1000;
+        String prefix = "jago_sand";
+        String fieldName = "creationDate";
+        String notExistingFieldName = "sticazzi";
 
         final ElasticsearchDAO dao = new ElasticsearchDAO(host, port, maxConnectionAttempts, connectionRetryBackoff);
 
@@ -309,12 +396,53 @@ public class ElasticsearchDAO {
         logger.info("All indices matching '{}': {}", prefix, indices);
 
         final String index = indices.get(0);
-        logger.info("Scroll query from beginning: {}", dao.startScroll(index, "creationDate", "0", 100));
+
+        Optional<String> firstValue = dao.getFirstValue(index, fieldName);
+        logger.info("First value for field: {} -> {}", fieldName, firstValue);
+
+        try {
+            firstValue = dao.getFirstValue(index, notExistingFieldName);
+        } catch (ElasticsearchStatusException e) {
+            logger.info("No value found for field: {} - Exception: {}", notExistingFieldName, e);
+        }
+
+        ElasticsearchScrollResponse resp = dao.startScroll(index, fieldName, "0", true, batchMaxRow);
+        logger.info("Scroll query from beginning: {}", resp);
+
+        long expectedHits = resp.getHits().totalHits;
+        long scrolledHit = resp.getHits().getHits().length;
+        while(resp.getHits().getHits().length > 0) {
+            resp = dao.continueScroll(resp.getScrollId());
+            logger.info("Another scroll returned: {} hits", resp.getHits().getHits().length);
+            scrolledHit += resp.getHits().getHits().length;
+        }
+        boolean success = expectedHits == scrolledHit;
+        if (success) {
+            logger.info("First scroll completed correctly");
+        } else {
+            logger.error("First scroll had total: {} but got: {} hits", expectedHits, scrolledHit);
+        }
+
+        resp = dao.startScroll(index, fieldName, "1544616732000", true, batchMaxRow);
+        logger.info("Scroll query from beginning: {}", resp);
+
+        expectedHits = resp.getHits().totalHits;
+        scrolledHit = resp.getHits().getHits().length;
+        while(resp.getHits().getHits().length > 0) {
+            resp = dao.continueScroll(resp.getScrollId());
+            logger.info("Another scroll returned: {} hits", resp.getHits().getHits().length);
+            scrolledHit += resp.getHits().getHits().length;
+        }
+        success = expectedHits == scrolledHit;
+        if (success) {
+            logger.info("Second scroll completed correctly");
+        } else {
+            logger.error("Second scroll had total: {} but got: {} hits", expectedHits, scrolledHit);
+        }
 
         logger.info("Closing client...");
         dao.closeQuietly();
         logger.info("Client closed");
-
     }
 
 }
