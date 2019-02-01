@@ -135,11 +135,11 @@ public class ElasticSourceTask extends SourceTask {
             }
 
             indicesQueue.add(new IncrementingIndexQuerier(
+                    elasticsearchDAO,
                     index,
                     topicPrefix,
                     incrementingField,
-                    offset,
-                    elasticConnectionProvider
+                    offset
             ));
         }
 
@@ -182,18 +182,8 @@ public class ElasticSourceTask extends SourceTask {
 
             try {
                 logger.debug("Checking for next block of results from {}", querier.toString());
-
                 final int batchMaxRows = config.getInt(ElasticSourceTaskConfig.BATCH_MAX_ROWS_CONFIG);
-                final List<SourceRecord> sourceRecords = querier.getRecords(elasticsearchDAO, batchMaxRows);
-
-                /* TODO:
-                if it was scrolling
-                    try to continue
-                    in case scroll was closed, invalidte it and try again later
-                else
-                    start a new scroll
-
-                */
+                final List<SourceRecord> sourceRecords = querier.getRecords(batchMaxRows);
 
                 if (sourceRecords.size() < batchMaxRows) {
                     // If we finished processing the results from the current query, we can reset and send
@@ -233,7 +223,7 @@ public class ElasticSourceTask extends SourceTask {
         logger.debug("Resetting querier {}", expectedHead.toString());
         IndexQuerier removedQuerier = indicesQueue.poll();
         assert removedQuerier == expectedHead;
-        expectedHead.reset(time.milliseconds(), elasticsearchDAO);
+        expectedHead.reset(time.milliseconds());
         indicesQueue.add(expectedHead);
     }
 

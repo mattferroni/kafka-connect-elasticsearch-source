@@ -200,9 +200,8 @@ public class ElasticsearchDAO {
     public Optional<String> getFirstValue(String index, String incrementingFieldName) throws IOException {
         final SearchRequest searchRequest = new SearchRequest(index);
         final SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(
-                matchAllQuery()
-        )
+        searchSourceBuilder
+                .query(matchAllQuery())
                 .sort(incrementingFieldName, SortOrder.ASC)
                 .size(1);
         searchRequest.source(searchSourceBuilder);
@@ -213,14 +212,14 @@ public class ElasticsearchDAO {
             return response;
         });
 
-        final SearchHit[] hits = searchResponse.getHits().getHits();
-        if (hits.length == 1 && hits[0].getSourceAsMap().containsKey(incrementingFieldName)) {
-            final String firstValue = hits[0].getSourceAsMap().get(incrementingFieldName).toString();
-            logger.debug("First value found for : {} -> {}", incrementingFieldName, firstValue);
-            return Optional.of(firstValue);
-        } else {
+        final SearchHits hits = searchResponse.getHits();
+        if (hits == null || hits.totalHits == 0 || hits.getHits() == null || hits.getHits().length == 0 || !hits.getHits()[0].getSourceAsMap().containsKey(incrementingFieldName)) {
             logger.warn("No first value found for field: {} - Complete response: {}", incrementingFieldName, searchResponse);
             return Optional.empty();
+        } else {
+            final String firstValue = hits.getHits()[0].getSourceAsMap().get(incrementingFieldName).toString();
+            logger.debug("First value found for : {} -> {}", incrementingFieldName, firstValue);
+            return Optional.of(firstValue);
         }
     }
 

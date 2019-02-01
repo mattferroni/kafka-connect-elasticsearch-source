@@ -15,34 +15,39 @@ abstract class IndexQuerier implements Comparable<IndexQuerier> {
 
     protected final String topicPrefix;
     protected final String indexName;
+    protected final ElasticsearchDAO elasticsearchDAO;
 
     // Mutable state
     protected long lastUpdate;
     protected String currentScrollId;
 
     protected IndexQuerier(
+            ElasticsearchDAO elasticsearchDAO,
             String indexName,
             String topicPrefix
     ) {
+        this.elasticsearchDAO = elasticsearchDAO;
         this.indexName = indexName;
         this.topicPrefix = topicPrefix;
         this.lastUpdate = 0;
     }
 
-    public abstract boolean isScrolling();
-
-    public abstract List<SourceRecord> getRecords(ElasticsearchDAO elasticsearchDAO, int batchMaxRows);
-
     public long getLastUpdate() {
         return lastUpdate;
     }
 
-    public void reset(long now, ElasticsearchDAO elasticsearchDAO) {
-        closeScrollQuietly(elasticsearchDAO);
+    public boolean isScrolling() {
+        return currentScrollId !=null;
+    }
+
+    public void reset(long now) {
+        closeScrollQuietly();
         lastUpdate = now;
     }
 
-    private void closeScrollQuietly(ElasticsearchDAO elasticsearchDAO) {
+    public abstract List<SourceRecord> getRecords(int batchMaxRows);
+
+    private void closeScrollQuietly() {
         if (currentScrollId != null) {
             try {
                 elasticsearchDAO.closeScrollQuietly(currentScrollId);
