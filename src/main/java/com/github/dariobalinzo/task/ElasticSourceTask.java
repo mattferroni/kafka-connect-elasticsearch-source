@@ -167,7 +167,7 @@ public class ElasticSourceTask extends SourceTask {
             if (!querier.isScrolling()) {
                 // Wait for next update time
                 final long nextUpdate = querier.getLastUpdate()
-                        + config.getInt(ElasticSourceTaskConfig.POLL_INTERVAL_MS_CONFIG);
+                        + config.getLong(ElasticSourceTaskConfig.POLL_INTERVAL_MS_CONFIG);
                 final long untilNext = nextUpdate - time.milliseconds();
                 if (untilNext > 0) {
                     logger.trace("Waiting {} ms to poll {} next", untilNext, querier.toString());
