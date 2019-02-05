@@ -90,12 +90,12 @@ public class Utils {
 
 
 
-    //not all elastic names are valid avro name
-    public static String filterAvroName(String elasticName) {
-        return elasticName == null ? null:elasticName.replaceAll("[^a-zA-Z0-9]", "");
+    // Not all elastic names are valid avro name
+    public static String sanitizeName(String fieldName) {
+        return fieldName == null ? null : fieldName.replaceAll("[^a-zA-Z0-9]", "");
     }
 
-    public static String filterAvroName(String prefix, String elasticName) {
-        return elasticName == null ? prefix:prefix+elasticName.replaceAll("[^a-zA-Z0-9]", "");
+    public static String sanitizeName(String containerName, String fieldName) {
+        return fieldName == null ? containerName : containerName+fieldName.replaceAll("[^a-zA-Z0-9]", "");
     }
 }

@@ -7,8 +7,6 @@ import com.github.dariobalinzo.schema.StructConverter;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.elasticsearch.action.search.*;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 
@@ -135,73 +133,33 @@ public class IncrementingIndexQuerier extends IndexQuerier {
             logger.debug("Retrieved {} hits and scroll id: {}", hits.totalHits, response.getScrollId());
 
             for (SearchHit hit : hits.getHits()) {
-                final Map<String, Object> sourceAsMap = hit.getSourceAsMap();
-                final Map sourcePartition = Collections.singletonMap(INDEX, indexName);
-                final Map sourceOffset = Collections.singletonMap(POSITION, sourceAsMap.get(incrementingFieldName).toString());
+                final Map<String, Object> documentAsMap = hit.getSourceAsMap();
+                final Map sourcePartition = Collections.singletonMap(ElasticSourceTaskConfig.INDEX, indexName);
+                final Map sourceOffset = Collections.singletonMap(ElasticSourceTaskConfig.POSITION, documentAsMap.get(incrementingFieldName).toString());
 
-                Schema schema = SchemaConverter.convertElasticMapping2AvroSchema(sourceAsMap, indexName);
-                Struct struct = StructConverter.convertElasticDocument2AvroStruct(sourceAsMap, schema);
+                final Schema schema = SchemaConverter.buildSchemaForDocument(documentAsMap, indexName);
+                final Struct struct = StructConverter.buildStructForDocument(documentAsMap, schema);
 
                 // Document key
-                String key = String.join("_", hit.getIndex(), hit.getType(), hit.getId());
+                // TODO: make key flexible
+                final String key = String.join("_", hit.getIndex(), hit.getType(), hit.getId());
 
                 SourceRecord sourceRecord = new SourceRecord(
                         sourcePartition,
                         sourceOffset,
                         targetTopic,
-                        //KEY
-                        Schema.STRING_SCHEMA,
+                        Schema.STRING_SCHEMA,   // TODO: make key flexible
                         key,
-                        //VALUE
-                        schema,
+                        schema, // Value
                         struct);
-                results.add(sourceRecord);
+                records.add(sourceRecord);
 
-                last.put(index,sourceAsMap.get(incrementingField).toString());
-                sent.merge(index, 1, Integer::sum);
+                incrementingFieldLastValue = Optional.of(documentAsMap.get(incrementingFieldName).toString());
             }
-
-
-
-            // TODO: do something with items and add them to results
-            // TODO: remember the last one found in memory
             return records;
         } catch (IOException e) {
-            // TODO: in case scroll or connection error, try to invalidate it and try again later
-            return Collections.emptyList();
+            throw new RuntimeException(e);
         }
-    }
-
-
-    @Override
-    public SourceRecord extractRecord(SearchHit hit) {
-        Map<String, Object> sourceAsMap = hit.getSourceAsMap();
-
-        // TODO: capire cosa fa qui
-        Map sourcePartition = Collections.singletonMap(INDEX, indexName);
-        Map sourceOffset = Collections.singletonMap(POSITION, sourceAsMap.get(incrementingFieldName).toString());
-
-        // TODO: capire cosa fa con lo schema
-        Schema valueSchema = SchemaConverter.convertElasticMapping2AvroSchema(sourceAsMap, indexName);
-        Struct struct = StructConverter.convertElasticDocument2AvroStruct(sourceAsMap, valueSchema);
-
-        // TODO: define key & topic strategy
-        final String key = String.join("_", hit.getIndex(), hit.getType(), hit.getId());
-        final String topic = topicPrefix + indexName;
-
-        SourceRecord sourceRecord = new SourceRecord(
-                sourcePartition,
-                sourceOffset,
-                topic,
-                Schema.STRING_SCHEMA, // Key schema
-                key,
-                valueSchema,          // Value schema
-                struct);
-
-        // TODO: capire cosa fa qui
-        last.put(indexName, sourceAsMap.get(incrementingFieldName).toString());
-        sent.merge(indexName, 1, Integer::sum);
-        return sourceRecord;
     }
 
 }

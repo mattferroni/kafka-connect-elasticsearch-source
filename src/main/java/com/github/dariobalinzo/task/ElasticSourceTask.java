@@ -41,11 +41,6 @@ public class ElasticSourceTask extends SourceTask {
 
     private static final Logger logger = LoggerFactory.getLogger(ElasticSourceTask.class);
 
-    // TODO: ok here?
-    private static final String OFFSET_NAME_FIELD = "OFFSET_NAME_FIELD";
-    private static final String OFFSET_KEY_KEY = "OFFSET_KEY_KEY";
-    private static final String OFFSET_KEY_VALUE = "OFFSET_KEY_VALUE";
-
     private final Time time;
     private ElasticSourceTaskConfig config;
     private ElasticsearchDAO elasticsearchDAO;
@@ -110,14 +105,16 @@ public class ElasticSourceTask extends SourceTask {
                     + "least one index assigned to it");
         }
 
+        /* // TODO: implement this
         List<Map<String, String>> partitions = indices.stream()
                 .map(indexName -> Collections.singletonMap(OFFSET_NAME_FIELD, indexName))
                 .collect(Collectors.toList());
         Map<Map<String, String>, Map<String, Object>> offsets = context.offsetStorageReader().offsets(partitions);
         logger.trace("The partition offsets are {}", offsets);
+        */
 
         for (String index : indices) {
-            // TODO: implement here multi-protocol support for offsets, if needed
+            /* TODO: implement here multi-protocol support for offsets, if needed
             // The partition map varies by offset protocol. Since we don't know which protocol each
             // table's offsets are keyed by, we need to use the different possible partitions
             // (newest protocol version first) to find the actual offsets for each table.
@@ -133,12 +130,14 @@ public class ElasticSourceTask extends SourceTask {
                     }
                 // }
             }
+            */
 
             indicesQueue.add(new IncrementingIndexQuerier(
                     elasticsearchDAO,
                     index,
                     topicPrefix,
                     incrementingField
+                    // TODO: add offset here, if present
             ));
         }
 

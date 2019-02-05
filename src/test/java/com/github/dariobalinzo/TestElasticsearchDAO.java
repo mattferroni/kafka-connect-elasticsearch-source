@@ -39,9 +39,9 @@ public class TestElasticsearchDAO extends TestCase {
             // do something with the SearchHit
             Map<String, Object> sourceAsMap = hit.getSourceAsMap();
             System.out.println(sourceAsMap);
-            Schema schema = SchemaConverter.convertElasticMapping2AvroSchema(sourceAsMap, "test");
+            Schema schema = SchemaConverter.buildSchemaForDocument(sourceAsMap, "test");
             schema.toString();
-            Struct struct = StructConverter.convertElasticDocument2AvroStruct(sourceAsMap,schema);
+            Struct struct = StructConverter.buildStructForDocument(sourceAsMap,schema);
             struct.toString();
         }
      */
