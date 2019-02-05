@@ -2,6 +2,8 @@ package com.github.dariobalinzo.task;
 
 import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -13,13 +15,14 @@ import java.util.List;
  */
 abstract class IndexQuerier implements Comparable<IndexQuerier> {
 
-    protected final String topicPrefix;
-    protected final String indexName;
+    protected final Logger logger = LoggerFactory.getLogger(this.getClass());
+
     protected final ElasticsearchDAO elasticsearchDAO;
+    protected final String indexName;
+    protected final String targetTopic;
 
     // Mutable state
     protected long lastUpdate;
-    protected String currentScrollId;
 
     protected IndexQuerier(
             ElasticsearchDAO elasticsearchDAO,
@@ -28,7 +31,7 @@ abstract class IndexQuerier implements Comparable<IndexQuerier> {
     ) {
         this.elasticsearchDAO = elasticsearchDAO;
         this.indexName = indexName;
-        this.topicPrefix = topicPrefix;
+        this.targetTopic = String.join(topicPrefix, "_", indexName);
         this.lastUpdate = 0;
     }
 
@@ -36,9 +39,9 @@ abstract class IndexQuerier implements Comparable<IndexQuerier> {
         return lastUpdate;
     }
 
-    public boolean isScrolling() {
-        return currentScrollId !=null;
-    }
+    public abstract boolean isScrolling();
+
+    protected abstract void closeScrollQuietly();
 
     public void reset(long now) {
         closeScrollQuietly();
@@ -46,17 +49,6 @@ abstract class IndexQuerier implements Comparable<IndexQuerier> {
     }
 
     public abstract List<SourceRecord> getRecords(int batchMaxRows);
-
-    private void closeScrollQuietly() {
-        if (currentScrollId != null) {
-            try {
-                elasticsearchDAO.closeScrollQuietly(currentScrollId);
-            } catch (IOException ignored) {
-                // intentionally ignored
-            }
-        }
-        currentScrollId = null;
-    }
 
     @Override
     public int compareTo(IndexQuerier other) {

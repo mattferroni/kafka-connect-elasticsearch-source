@@ -322,6 +322,11 @@ public class ElasticsearchDAO {
                     }
 
                     final SearchHits hits = ((SearchResponse) response).getHits();
+                    assert (hits != null) : "Null hits received from Elasticsearch client";
+
+                    final String scrollId = ((SearchResponse) response).getScrollId();
+                    assert (scrollId != null) : "Null scrollId received from Elasticsearch client";
+
                     final int totalShards = ((SearchResponse) response).getTotalShards();
                     final int successfulShards = ((SearchResponse) response).getSuccessfulShards();
                     logger.debug("Total shard: {} - Successful: {} - Total hits: {} - Current hits: {}", totalShards, successfulShards, hits.totalHits, hits.getHits().length);

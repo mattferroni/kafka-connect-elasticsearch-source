@@ -138,8 +138,7 @@ public class ElasticSourceTask extends SourceTask {
                     elasticsearchDAO,
                     index,
                     topicPrefix,
-                    incrementingField,
-                    offset
+                    incrementingField
             ));
         }
 
