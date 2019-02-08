@@ -30,7 +30,7 @@ abstract class IndexQuerier implements Comparable<IndexQuerier> {
     ) {
         this.elasticsearchDAO = elasticsearchDAO;
         this.indexName = indexName;
-        this.targetTopic = String.join("_", topicPrefix, indexName);
+        this.targetTopic = topicPrefix.concat(indexName);
         this.lastUpdate = 0;
     }
 
