@@ -16,60 +16,79 @@
 
 package com.github.dariobalinzo.utils;
 
+import com.github.dariobalinzo.ElasticSourceConnectorConfig;
+import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
+import com.github.dariobalinzo.task.ElasticSourceTaskConfig;
 import org.elasticsearch.client.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 public class Utils {
 
     public static final Logger logger = LoggerFactory.getLogger(Utils.class);
 
-    public static List<List<String>> groupPartitions(List<String> currentIndices, int numGroups) {
-        List<List<String>> result = new ArrayList<>(numGroups);
-        for (int i=0; i<numGroups; ++i) {
-            result.add(new ArrayList<>());
-        }
+    public static ElasticsearchDAO initElasticsearchDAO(
+            final ElasticSourceConnectorConfig config
+    ) {
+        final String esHost = config.getString(ElasticSourceConnectorConfig.ES_HOST_CONF);
+        final int esPort = config.getInt(ElasticSourceConnectorConfig.ES_PORT_CONF);
 
-        for (int i=0; i<currentIndices.size(); ++i) {
-            result.get(i%numGroups).add(currentIndices.get(i));
-        }
+        final String esUser = config.getString(ElasticSourceConnectorConfig.ES_USER_CONF);
+        final String esPwd = config.getString(ElasticSourceConnectorConfig.ES_PWD_CONF);
 
-        return result;
+        final int maxConnectionAttempts = config.getInt(ElasticSourceConnectorConfig.CONNECTION_ATTEMPTS_CONFIG);
+        final long connectionRetryBackoff = config.getLong(ElasticSourceConnectorConfig.CONNECTION_BACKOFF_CONFIG);
+
+        final ElasticsearchDAO elasticConnectionProvider;
+        if (esUser == null || esUser.isEmpty()) {
+            elasticConnectionProvider = new ElasticsearchDAO(
+                    esHost,
+                    esPort,
+                    maxConnectionAttempts,
+                    connectionRetryBackoff
+            );
+        } else {
+            elasticConnectionProvider = new ElasticsearchDAO(
+                    esHost,
+                    esPort,
+                    esUser,
+                    esPwd,
+                    maxConnectionAttempts,
+                    connectionRetryBackoff
+            );
+        }
+        return elasticConnectionProvider;
     }
 
-    public static List<String> getIndexList(Response indicesReply, String prefix) {
-
-        List<String> result = new ArrayList<>();
-
-        try (BufferedReader reader = new BufferedReader( new InputStreamReader( indicesReply.getEntity().getContent()))) {
-            String line = null;
-
-            while ((line = reader.readLine()) != null) {
-                String index = line.split("\\s+")[2];
-                if (index.startsWith(prefix)) {
-                    result.add(index);
-                }
-            }
-        } catch (IOException e) {
-            logger.error("error while getting indices",e);
-        }
-
-        return result;
+    public static Map<String, String> generateKeyForOffsetsTopic(String indexName) {
+        return Collections.singletonMap(
+                ElasticSourceTaskConfig.KEY_FOR_OFFSETS_KEY,
+                indexName
+        );
     }
 
-
-    //not all elastic names are valid avro name
-    public static String filterAvroName(String elasticName) {
-        return elasticName == null ? null:elasticName.replaceAll("[^a-zA-Z0-9]", "");
+    public static Map<String, String> generateValueForOffsetsTopic(String incrementingFieldLastValue) {
+        return Collections.singletonMap(
+                ElasticSourceTaskConfig.KEY_FOR_OFFSETS_VALUE,
+                incrementingFieldLastValue
+        );
     }
 
-    public static String filterAvroName(String prefix, String elasticName) {
-        return elasticName == null ? prefix:prefix+elasticName.replaceAll("[^a-zA-Z0-9]", "");
+    // Not all elastic names are valid avro name
+    public static String sanitizeName(String fieldName) {
+        return fieldName == null ? null : fieldName.replaceAll("[^a-zA-Z0-9]", "");
+    }
+
+    public static String sanitizeName(String containerName, String fieldName) {
+        return fieldName == null ? containerName : containerName+fieldName.replaceAll("[^a-zA-Z0-9]", "");
     }
 }

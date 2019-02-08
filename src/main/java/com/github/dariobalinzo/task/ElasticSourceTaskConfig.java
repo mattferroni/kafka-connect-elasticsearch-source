@@ -30,8 +30,14 @@ import java.util.Map;
  */
 public class ElasticSourceTaskConfig extends ElasticSourceConnectorConfig {
 
+    public static final String KEY_FOR_OFFSETS_KEY = "indexName";
+    public static final String KEY_FOR_OFFSETS_VALUE = "incrementingFieldLastValue";
+
+    public static final String INDICES_CONFIG = "es.indices";
+    public static final String INDICES_DOC = "List of indices for this task to watch for changes.";
+
     static ConfigDef config = baseConfigDef()
-            .define(INDICES_CONFIG, Type.STRING, Importance.HIGH, INDICES_CONFIG);
+            .define(INDICES_CONFIG, Type.STRING, Importance.HIGH, INDICES_DOC);
 
     public ElasticSourceTaskConfig(Map<String, String> props) {
         super(config, props);

@@ -17,360 +17,218 @@
 package com.github.dariobalinzo.task;
 
 import com.github.dariobalinzo.ElasticSourceConnectorConfig;
-import com.github.dariobalinzo.schema.SchemaConverter;
-import com.github.dariobalinzo.schema.StructConverter;
-import com.github.dariobalinzo.utils.ElasticConnection;
+import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
+import com.github.dariobalinzo.utils.Utils;
 import com.github.dariobalinzo.utils.Version;
 import org.apache.kafka.common.config.ConfigException;
-import org.apache.kafka.common.config.types.Password;
-import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.common.utils.SystemTime;
+import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
-import org.elasticsearch.action.search.*;
-import org.elasticsearch.common.unit.TimeValue;
-import org.elasticsearch.search.Scroll;
-import org.elasticsearch.search.SearchHit;
-import org.elasticsearch.search.SearchHits;
-import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.search.sort.SortOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
-import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
-import static org.elasticsearch.index.query.QueryBuilders.rangeQuery;
-
+/**
+ * ElasticSourceTask is a Kafka Connect SourceTask implementation that reads from ElasticSearch
+ * indices and generates Kafka Connect records.
+ */
 public class ElasticSourceTask extends SourceTask {
 
     private static final Logger logger = LoggerFactory.getLogger(ElasticSourceTask.class);
-    private static final String INDEX = "index";
-    private static final String POSITION = "position";
 
+    private final Time time;
     private ElasticSourceTaskConfig config;
-    private ElasticConnection es;
+    private ElasticsearchDAO elasticsearchDAO;
 
-    private AtomicBoolean stopping = new AtomicBoolean(false);
-    private List<String> indices;
-    private long connectionRetryBackoff;
-    private int maxConnectionAttempts;
-    private String topic;
-    private String incrementingField;
-    private int size;
-    private int pollingMs;
-    private Map<String,String> last = new HashMap<>();
-    private Map<String,Integer> sent = new HashMap<>();
+    private PriorityQueue<IndexQuerier> indicesQueue = new PriorityQueue<>();
+    private final AtomicBoolean running = new AtomicBoolean(false);
 
     public ElasticSourceTask() {
+        this.time = new SystemTime();
+    }
 
+    public ElasticSourceTask(Time time) {
+        this.time = time;
     }
 
     @Override
     public String version() {
-        return Version.VERSION;
+        return Version.getVersion();
     }
 
     @Override
     public void start(Map<String, String> properties) {
+        logger.info("Starting ElasticSourceTask");
+
         try {
             config = new ElasticSourceTaskConfig(properties);
         } catch (ConfigException e) {
-            throw new ConnectException("Couldn't start ElasticSourceTask due to configuration error", e);
+            throw new ConfigException("Couldn't start ElasticSourceTask due to configuration error", e);
         }
 
-        initEsConnection();
+        elasticsearchDAO = Utils.initElasticsearchDAO(config);
+        if (!elasticsearchDAO.testConnection()) {
+            throw new ConnectException("Cannot connect to ElasticSearch");
+        }
 
-        indices = Arrays.asList(config.getString(ElasticSourceTaskConfig.INDICES_CONFIG).split(","));
+        logger.debug("Connected to ElasticSearch");
+
+        /* TODO: add here multiple mode configs, e.g.: (inspiration from JDBC connector)
+         * - bulk - perform a bulk load of the entire table each time it is polled
+         * - incrementing - use a strictly incrementing column on each table to detect
+         *      only new rows. Note that this will not detect modifications or deletions
+         *      of existing rows
+         * - timestamp - use a timestamp (or timestamp-like) column to detect new and
+         *      modified rows. This assumes the column is updated with each write, and
+         *      that values are monotonically incrementing, but not necessarily unique
+         * - timestamp+incrementing - use two columns, a timestamp column that detects
+         *      new and modified rows and a strictly incrementing column which provides a
+         *      globally unique ID for updates so each row can be assigned a unique stream
+         *      offset
+        */
+        String mode = config.getString(ElasticSourceTaskConfig.MODE_CONFIG);
+        if (!mode.equals(ElasticSourceTaskConfig.MODE_INCREMENTING)) {
+            throw new ConfigException("Current version supports only mode: " + ElasticSourceTaskConfig.MODE_INCREMENTING);
+        }
+
+        final String topicPrefix = config.getString(ElasticSourceConnectorConfig.TOPIC_PREFIX_CONFIG);
+        final String incrementingField = config.getString(ElasticSourceConnectorConfig.INCREMENTING_FIELD_NAME_CONFIG);
+
+        final List<String> indices = Arrays.asList(config.getString(ElasticSourceTaskConfig.INDICES_CONFIG).split(","));
         if (indices.isEmpty()) {
             throw new ConnectException("Invalid configuration: each ElasticSourceTask must have at "
                     + "least one index assigned to it");
         }
 
-        topic = config.getString(ElasticSourceConnectorConfig.TOPIC_PREFIX_CONFIG);
-        incrementingField = config.getString(ElasticSourceConnectorConfig.INCREMENTING_FIELD_NAME_CONFIG);
-        size = Integer.parseInt(config.getString(ElasticSourceConnectorConfig.BATCH_MAX_ROWS_CONFIG));
-        pollingMs = Integer.parseInt(config.getString(ElasticSourceConnectorConfig.POLL_INTERVAL_MS_CONFIG));
-    }
+        List<Map<String, String>> partitions = indices.stream()
+                .map(indexName -> Utils.generateKeyForOffsetsTopic(indexName))
+                .collect(Collectors.toList());
+        Map<Map<String, String>, Map<String, Object>> offsets = context.offsetStorageReader().offsets(partitions);
+        logger.debug("The partition offsets are {}", offsets);
 
-    private void initEsConnection() {
-
-        final String esHost = config.getString(ElasticSourceConnectorConfig.ES_HOST_CONF);
-        final int esPort = Integer.parseInt(config.getString(ElasticSourceConnectorConfig.ES_PORT_CONF));
-
-        final String esUser = config.getString(ElasticSourceConnectorConfig.ES_USER_CONF);
-        final String esPwd = config.getString(ElasticSourceConnectorConfig.ES_PWD_CONF);
-
-        maxConnectionAttempts = Integer.parseInt(config.getString(
-                ElasticSourceConnectorConfig.CONNECTION_ATTEMPTS_CONFIG
-        ));
-        connectionRetryBackoff = Long.parseLong(config.getString(
-                ElasticSourceConnectorConfig.CONNECTION_BACKOFF_CONFIG
-        ));
-        if (esUser == null || esUser.isEmpty()) {
-            es = new ElasticConnection(
-                    esHost,
-                    esPort,
-                    maxConnectionAttempts,
-                    connectionRetryBackoff
-            );
-        } else {
-            es = new ElasticConnection(
-                    esHost,
-                    esPort,
-                    esUser,
-                    esPwd,
-                    maxConnectionAttempts,
-                    connectionRetryBackoff
-            );
-
+        for (String index : indices) {
+            Map<String, Object> currentOffset = offsets.get(Utils.generateKeyForOffsetsTopic(index));
+            if (currentOffset != null && currentOffset.containsKey(ElasticSourceTaskConfig.KEY_FOR_OFFSETS_VALUE)) {
+                final String incrementingFieldLastValue = currentOffset.get(ElasticSourceTaskConfig.KEY_FOR_OFFSETS_VALUE).toString();
+                logger.info("Committed value found for field '{}' - Start polling since '{}' for index: {}", incrementingField, incrementingFieldLastValue, index);
+                indicesQueue.add(new IncrementingIndexQuerier(
+                        elasticsearchDAO,
+                        index,
+                        topicPrefix,
+                        incrementingField,
+                        incrementingFieldLastValue
+                ));
+            } else {
+                logger.info("No committed value found for field '{}' - Start polling from the beginning of index: {}", incrementingField, index);
+                indicesQueue.add(new IncrementingIndexQuerier(
+                        elasticsearchDAO,
+                        index,
+                        topicPrefix,
+                        incrementingField
+                ));
+            }
         }
 
+        running.set(true);
+        logger.info("Started ElasticSourceTask");
     }
 
-
-    //will be called by connect with a different thread than the stop thread
+    /*
+     * This method is synchronized as SourceTasks are given a dedicated thread which they can block
+     * indefinitely, so they need to be stopped with a call from a different thread in the Worker
+     */
     @Override
-    public List<SourceRecord> poll() throws InterruptedException {
-
-        List<SourceRecord> results = new ArrayList<>();
-        indices.forEach(
-                index -> {
-                    if (!stopping.get()) {
-                        logger.info("fetching from {}", index);
-                        String lastValue = fetchLastOffset(index);
-                        logger.info("found last value {}", lastValue);
-                        if (lastValue != null) {
-                            executeScroll(index, lastValue, results);
-                        }
-                        logger.info("index {} total messages: {} ",index,sent.get(index));
-                    }
-                }
-        );
-        if (results.isEmpty()) {
-            logger.info("no data found, sleeping for {} ms",pollingMs);
-            Thread.sleep(pollingMs);
-        }
-        return results;
+    public synchronized void stop() {
+        logger.info("Stopping ElasticSourceTask");
+        running.set(false);
+        // All resources are closed at the end of 'poll()' when no longer running or
+        // if there is an error
     }
 
-    private String fetchLastOffset(String index) {
+    @Override
+    public List<SourceRecord> poll() {
+        logger.trace("ElasticSourceTask polling for new data");
 
+        while (running.get()) {
+            final IndexQuerier querier = indicesQueue.peek();
 
-        //first we check in cache memory the last value
-        if (last.get(index)!= null) {
-            return last.get(index);
-        }
+            if (!querier.isScrolling()) {
+                // Wait for next update time
+                final long nextUpdate = querier.getLastUpdate()
+                        + config.getLong(ElasticSourceTaskConfig.POLL_INTERVAL_MS_CONFIG);
+                final long untilNext = nextUpdate - time.milliseconds();
+                if (untilNext > 0) {
+                    logger.trace("Waiting {} ms to poll {} next", untilNext, querier.toString());
+                    time.sleep(untilNext);
+                    continue; // Re-check stop flag before continuing
+                } else {
+                    logger.trace("{} can proceed with a new scroll query", querier.toString());
+                }
+            }
 
-        //if cache is empty we check the framework
-        Map<String, Object> offset = context.offsetStorageReader().offset(Collections.singletonMap(INDEX, index));
-        if (offset != null) {
-            return (String) offset.get(POSITION);
-        } else {
-            //first execution, no last value
-            //fetching the lower level directly to the elastic index (if it is not empty)
-            SearchRequest searchRequest = new SearchRequest(index);
-            SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-            searchSourceBuilder.query(
-                    matchAllQuery()
-            ).sort(incrementingField, SortOrder.ASC);
-            searchSourceBuilder.size(1); // only one record
-            searchRequest.source(searchSourceBuilder);
-            SearchResponse searchResponse = null;
             try {
-                for (int i = 0; i < maxConnectionAttempts; ++i) {
-                    try {
-                        searchResponse = es.getClient().search(searchRequest);
-                        break;
-                    } catch (IOException e) {
-                        logger.error("error in scroll");
-                        Thread.sleep(connectionRetryBackoff);
-                    }
-                }
-                if (searchResponse == null) {
-                    throw new RuntimeException("connection failed");
-                }
-                SearchHits hits = searchResponse.getHits();
-                int totalShards = searchResponse.getTotalShards();
-                int successfulShards = searchResponse.getSuccessfulShards();
+                logger.debug("Checking for next block of results from {}", querier.toString());
+                final int batchMaxRows = config.getInt(ElasticSourceTaskConfig.BATCH_MAX_ROWS_CONFIG);
+                final List<SourceRecord> sourceRecords = querier.getRecords(batchMaxRows);
 
-                logger.info("total shard {}, successuful: {}", totalShards, successfulShards);
-
-                int failedShards = searchResponse.getFailedShards();
-                for (ShardSearchFailure failure : searchResponse.getShardFailures()) {
-                    // failures should be handled here
-                    logger.error("failed {}", failure);
-                }
-                if (failedShards > 0) {
-                    throw new RuntimeException("failed shard in search");
+                if (sourceRecords.size() < batchMaxRows) {
+                    // If we finished processing the results from the current query, we can reset and send
+                    // the querier to the tail of the queue
+                    resetAndRequeueHead(querier);
                 }
 
-                SearchHit[] searchHits = hits.getHits();
-                //here only one record
-                for (SearchHit hit : searchHits) {
-                    // do something with the SearchHit
-                    return hit.getSourceAsMap().get(incrementingField).toString();
-
+                if (sourceRecords.isEmpty()) {
+                    logger.trace("No updates for {}", querier.toString());
+                    continue;
                 }
 
-            } catch (Exception e) {
-                logger.error("error fetching min value", e);
-                return null;
+                logger.debug("Returning {} records for {}", sourceRecords.size(), querier.toString());
+                return sourceRecords;
+            } catch (RuntimeException e) {
+                logger.error("Failed to run query for index: {} - Continue with the next index...", querier.toString(), e);
+                resetAndRequeueHead(querier);
+                return Collections.emptyList();
+            } catch (Throwable t) {
+                resetAndRequeueHead(querier);
+                // This task has failed, so close any resources (may be reopened if needed) before throwing
+                closeResources();
+                throw t;
             }
         }
-        return null;
 
+        // Only in case of shutdown
+        final IndexQuerier querier = indicesQueue.peek();
+        if (querier != null) {
+            resetAndRequeueHead(querier);
+        }
+        closeResources();
+        return Collections.emptyList();
     }
 
-    private void executeScroll(String index, String lastValue, List<SourceRecord> results) {
-        SearchRequest searchRequest = new SearchRequest(index);
-        searchRequest.scroll(TimeValue.timeValueMinutes(1L));
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(
-                rangeQuery(incrementingField)
-                        .from(lastValue, last.get(index)== null)
-        ).sort(incrementingField, SortOrder.ASC); //TODO configure custom query
-        searchSourceBuilder.size(1000);
-        searchRequest.source(searchSourceBuilder);
-        SearchResponse searchResponse = null;
-        String scrollId = null;
-        try {
-            for (int i = 0; i < maxConnectionAttempts; ++i) {
-                try {
-                    searchResponse = es.getClient().search(searchRequest);
-                    break;
-                } catch (IOException e) {
-                    logger.error("error in scroll");
-                    Thread.sleep(connectionRetryBackoff);
-                }
-            }
-            if (searchResponse == null) {
-                throw new RuntimeException("connection failed");
-            }
-            scrollId = searchResponse.getScrollId();
-            SearchHit[] searchHits = parseSearchResult(index, lastValue, results, searchResponse, scrollId);
+    private void resetAndRequeueHead(IndexQuerier expectedHead) {
+        logger.debug("Resetting querier {}", expectedHead.toString());
+        IndexQuerier removedQuerier = indicesQueue.poll();
+        assert removedQuerier == expectedHead;
+        expectedHead.reset(time.milliseconds());
+        indicesQueue.add(expectedHead);
+    }
 
-            while (!stopping.get() && searchHits != null && searchHits.length > 0 && results.size() < size) {
-                SearchScrollRequest scrollRequest = new SearchScrollRequest(scrollId);
-                scrollRequest.scroll(TimeValue.timeValueMinutes(1L));
-                searchResponse = es.getClient().searchScroll(scrollRequest);
-                scrollId = searchResponse.getScrollId();
-                searchHits = parseSearchResult(index, lastValue, results, searchResponse, scrollId);
+    protected void closeResources() {
+        logger.info("Closing resources for ElasticSourceTask");
+        try {
+            if (elasticsearchDAO != null) {
+                elasticsearchDAO.closeQuietly();
             }
         } catch (Throwable t) {
-            logger.error("error", t);
+            logger.error("Error while closing the connections", t);
         } finally {
-            closeScrollQuietly(scrollId);
+            elasticsearchDAO = null;
         }
-
-
     }
 
-    private SearchHit[] parseSearchResult(String index, String lastValue, List<SourceRecord> results, SearchResponse searchResponse, Object scrollId) {
-
-        if (results.size() > size) {
-            return null; //nothing to do: limit reached
-        }
-
-        SearchHits hits = searchResponse.getHits();
-        int totalShards = searchResponse.getTotalShards();
-        int successfulShards = searchResponse.getSuccessfulShards();
-
-        logger.info("total shard {}, successuful: {}", totalShards, successfulShards);
-        logger.info("retrived {}, scroll id : {}", hits, scrollId);
-
-        int failedShards = searchResponse.getFailedShards();
-        for (ShardSearchFailure failure : searchResponse.getShardFailures()) {
-            // failures should be handled here
-            logger.error("failed {}", failure);
-        }
-        if (failedShards > 0) {
-            throw new RuntimeException("failed shard in search");
-        }
-
-        SearchHit[] searchHits = hits.getHits();
-        for (SearchHit hit : searchHits) {
-            // do something with the SearchHit
-            Map<String, Object> sourceAsMap = hit.getSourceAsMap();
-            Map sourcePartition = Collections.singletonMap(INDEX, index);
-            Map sourceOffset = Collections.singletonMap(POSITION, sourceAsMap.get(incrementingField).toString());
-            Schema schema = SchemaConverter.convertElasticMapping2AvroSchema(sourceAsMap, index);
-            Struct struct = StructConverter.convertElasticDocument2AvroStruct(sourceAsMap, schema);
-
-            //document key
-            String key = String.join("_", hit.getIndex(), hit.getType(), hit.getId());
-
-            SourceRecord sourceRecord = new SourceRecord(
-                    sourcePartition,
-                    sourceOffset,
-                    topic + index,
-                    //KEY
-                    Schema.STRING_SCHEMA,
-                    key,
-                    //VALUE
-                    schema,
-                    struct);
-            results.add(sourceRecord);
-
-            last.put(index,sourceAsMap.get(incrementingField).toString());
-            sent.merge(index, 1, Integer::sum);
-        }
-        return searchHits;
-    }
-
-    private void closeScrollQuietly(String scrollId) {
-        ClearScrollRequest clearScrollRequest = new ClearScrollRequest();
-        clearScrollRequest.addScrollId(scrollId);
-        ClearScrollResponse clearScrollResponse = null;
-        try {
-            clearScrollResponse = es.getClient().clearScroll(clearScrollRequest);
-        } catch (IOException e) {
-            logger.error("error in clear scroll", e);
-        }
-        boolean succeeded = clearScrollResponse != null && clearScrollResponse.isSucceeded();
-        logger.info("scroll {} cleared: {}", scrollId, succeeded);
-    }
-
-    //will be called by connect with a different thread than poll thread
-    public void stop() {
-
-        if (stopping != null) {
-            stopping.set(true);
-        }
-
-        if (es != null) {
-            es.closeQuietly();
-        }
-
-    }
-
-    //utility method for testing
-    public void setupTest(List<String> index) {
-
-        final String esHost = "localhost";
-        final int esPort = 9200;
-
-        maxConnectionAttempts = 3;
-        connectionRetryBackoff = 1000;
-        es = new ElasticConnection(
-                esHost,
-                esPort,
-                maxConnectionAttempts,
-                connectionRetryBackoff
-        );
-
-        indices = index;
-        if (indices.isEmpty()) {
-            throw new ConnectException("Invalid configuration: each ElasticSourceTask must have at "
-                    + "least one index assigned to it");
-        }
-
-        topic = "connect_";
-        incrementingField = "@timestamp";
-        size = 10000;
-        pollingMs = 1000;
-    }
 }

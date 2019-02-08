@@ -17,5 +17,11 @@
 package com.github.dariobalinzo.utils;
 
 public class Version {
-    public static final String VERSION = "0.1";
+
+    // TODO: externalize this
+    private static final String version = "0.2";
+
+    public static String getVersion() {
+        return version;
+    }
 }
