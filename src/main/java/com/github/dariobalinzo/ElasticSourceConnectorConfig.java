@@ -48,25 +48,25 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
     private static final String CONNECTION_ATTEMPTS_DOC
             = "Maximum number of attempts to retrieve a valid Elasticsearch connection.";
     private static final String CONNECTION_ATTEMPTS_DISPLAY = "Elasticsearch connection attempts";
-    private static final String CONNECTION_ATTEMPTS_DEFAULT = "3";
+    private static final Integer CONNECTION_ATTEMPTS_DEFAULT = 6;
 
     public static final String CONNECTION_BACKOFF_CONFIG = "connection.backoff.ms";
     private static final String CONNECTION_BACKOFF_DOC
             = "Backoff time in milliseconds between connection attempts.";
     private static final String CONNECTION_BACKOFF_DISPLAY
             = "Elastic connection backoff in milliseconds";
-    private static final String CONNECTION_BACKOFF_DEFAULT = "10000";
+    private static final Long CONNECTION_BACKOFF_DEFAULT = 10000l;
 
     public static final String POLL_INTERVAL_MS_CONFIG = "poll.interval.ms";
     private static final String POLL_INTERVAL_MS_DOC = "Frequency in ms to poll for new data in "
             + "each index.";
-    private static final String POLL_INTERVAL_MS_DEFAULT = "5000";
+    private static final Long POLL_INTERVAL_MS_DEFAULT = 5000l;
     private static final String POLL_INTERVAL_MS_DISPLAY = "Poll Interval (ms)";
 
     public static final String BATCH_MAX_ROWS_CONFIG = "batch.max.rows";
     private static final String BATCH_MAX_ROWS_DOC =
             "Maximum number of documents to include in a single batch when polling for new data.";
-    private static final String BATCH_MAX_ROWS_DEFAULT = "1000";
+    private static final Long BATCH_MAX_ROWS_DEFAULT = 1000l;
     private static final String BATCH_MAX_ROWS_DISPLAY = "Max Documents Per Batch";
 
     public static final String MODE_UNSPECIFIED = "";
@@ -90,7 +90,6 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
 
     public static final String INDEX_PREFIX_CONFIG = "index.prefix";
     private static final String INDEX_PREFIX_DOC = "List of indices to include in copying.";
-    private static final String INDEX_PREFIX_DEFAULT = "";
     private static final String INDEX_PREFIX_DISPLAY = "Indices prefix Whitelist";
 
     public static final String TOPIC_PREFIX_CONFIG = "topic.prefix";
@@ -179,7 +178,6 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
         ).define(
                 INDEX_PREFIX_CONFIG,
                 Type.STRING,
-                INDEX_PREFIX_DEFAULT,
                 Importance.MEDIUM,
                 INDEX_PREFIX_DOC,
                 DATABASE_GROUP,

@@ -43,21 +43,15 @@ public class Utils {
             final ElasticSourceConnectorConfig config
     ) {
         final String esHost = config.getString(ElasticSourceConnectorConfig.ES_HOST_CONF);
-        final int esPort = Integer.parseInt(config.getString(ElasticSourceConnectorConfig.ES_PORT_CONF));
+        final int esPort = config.getInt(ElasticSourceConnectorConfig.ES_PORT_CONF);
 
         final String esUser = config.getString(ElasticSourceConnectorConfig.ES_USER_CONF);
         final String esPwd = config.getString(ElasticSourceConnectorConfig.ES_PWD_CONF);
 
-        final int maxConnectionAttempts = Integer.parseInt(config.getString(
-                ElasticSourceConnectorConfig.CONNECTION_ATTEMPTS_CONFIG
-        ));
-        final long connectionRetryBackoff = Long.parseLong(config.getString(
-                ElasticSourceConnectorConfig.CONNECTION_BACKOFF_CONFIG
-        ));
+        final int maxConnectionAttempts = config.getInt(ElasticSourceConnectorConfig.CONNECTION_ATTEMPTS_CONFIG);
+        final long connectionRetryBackoff = config.getLong(ElasticSourceConnectorConfig.CONNECTION_BACKOFF_CONFIG);
 
-        final long batchMaxRows = Long.parseLong(config.getString(
-                ElasticSourceConnectorConfig.BATCH_MAX_ROWS_CONFIG
-        ));
+        final long batchMaxRows = config.getLong(ElasticSourceConnectorConfig.BATCH_MAX_ROWS_CONFIG);
 
         final ElasticsearchDAO elasticConnectionProvider;
         if (esUser == null || esUser.isEmpty()) {

@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 /**
  * ElasticSourceTask is a Kafka Connect SourceTask implementation that reads from ElasticSearch
