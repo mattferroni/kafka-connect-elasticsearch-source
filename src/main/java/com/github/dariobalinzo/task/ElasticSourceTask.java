@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
  * ElasticSourceTask is a Kafka Connect SourceTask implementation that reads from ElasticSearch
@@ -104,40 +105,33 @@ public class ElasticSourceTask extends SourceTask {
                     + "least one index assigned to it");
         }
 
-        /* // TODO: implement this
         List<Map<String, String>> partitions = indices.stream()
-                .map(indexName -> Collections.singletonMap(OFFSET_NAME_FIELD, indexName))
+                .map(indexName -> Utils.generateKeyForOffsetsTopic(indexName))
                 .collect(Collectors.toList());
         Map<Map<String, String>, Map<String, Object>> offsets = context.offsetStorageReader().offsets(partitions);
-        logger.trace("The partition offsets are {}", offsets);
-        */
+        logger.debug("The partition offsets are {}", offsets);
 
         for (String index : indices) {
-            /* TODO: implement here multi-protocol support for offsets, if needed
-            // The partition map varies by offset protocol. Since we don't know which protocol each
-            // table's offsets are keyed by, we need to use the different possible partitions
-            // (newest protocol version first) to find the actual offsets for each table.
-            Map<String, Object> offset = null;
-            if (offsets != null) {
-                // TODO: delirio here!
-                // for (Map<String, String> toCheckPartition : tablePartitionsToCheck) {
-                    String toCheckPartition = index;
-                    offset = offsets.get(toCheckPartition);
-                    if (offset != null) {
-                        logger.info("Found offset {} for partition {}", offsets, toCheckPartition);
-                        break;
-                    }
-                // }
+            Map<String, Object> currentOffset = offsets.get(Utils.generateKeyForOffsetsTopic(index));
+            if (currentOffset != null && currentOffset.containsKey(ElasticSourceTaskConfig.KEY_FOR_OFFSETS_VALUE)) {
+                final String incrementingFieldLastValue = currentOffset.get(ElasticSourceTaskConfig.KEY_FOR_OFFSETS_VALUE).toString();
+                logger.info("Committed value found for field '{}' - Start polling since '{}' for index: {}", incrementingField, incrementingFieldLastValue, index);
+                indicesQueue.add(new IncrementingIndexQuerier(
+                        elasticsearchDAO,
+                        index,
+                        topicPrefix,
+                        incrementingField,
+                        incrementingFieldLastValue
+                ));
+            } else {
+                logger.info("No committed value found for field '{}' - Start polling from the beginning of index: {}", incrementingField, index);
+                indicesQueue.add(new IncrementingIndexQuerier(
+                        elasticsearchDAO,
+                        index,
+                        topicPrefix,
+                        incrementingField
+                ));
             }
-            */
-
-            indicesQueue.add(new IncrementingIndexQuerier(
-                    elasticsearchDAO,
-                    index,
-                    topicPrefix,
-                    incrementingField
-                    // TODO: add offset here, if present
-            ));
         }
 
         running.set(true);

@@ -30,9 +30,8 @@ import java.util.Map;
  */
 public class ElasticSourceTaskConfig extends ElasticSourceConnectorConfig {
 
-    // TODO: ok here?
-    public static final String INDEX = "index";
-    public static final String POSITION = "position";
+    public static final String KEY_FOR_OFFSETS_KEY = "indexName";
+    public static final String KEY_FOR_OFFSETS_VALUE = "incrementingFieldLastValue";
 
     public static final String INDICES_CONFIG = "es.indices";
     public static final String INDICES_DOC = "List of indices for this task to watch for changes.";

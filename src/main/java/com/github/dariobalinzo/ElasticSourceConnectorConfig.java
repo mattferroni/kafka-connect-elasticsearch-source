@@ -66,7 +66,7 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
     public static final String BATCH_MAX_ROWS_CONFIG = "batch.max.rows";
     private static final String BATCH_MAX_ROWS_DOC =
             "Maximum number of documents to include in a single batch when polling for new data.";
-    private static final Long BATCH_MAX_ROWS_DEFAULT = 1000l;
+    private static final Integer BATCH_MAX_ROWS_DEFAULT = 1000;
     private static final String BATCH_MAX_ROWS_DISPLAY = "Max Documents Per Batch";
 
     public static final String MODE_UNSPECIFIED = "";
@@ -127,7 +127,7 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
                 Collections.singletonList(INDEX_PREFIX_CONFIG)
         ).define(
                 ES_PORT_CONF,
-                Type.STRING,
+                Type.INT,
                 Importance.HIGH,
                 ES_PORT_DOC,
                 DATABASE_GROUP,
@@ -157,7 +157,7 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
                 ES_PWD_DISPLAY
         ).define(
                 CONNECTION_ATTEMPTS_CONFIG,
-                Type.STRING,
+                Type.INT,
                 CONNECTION_ATTEMPTS_DEFAULT,
                 Importance.LOW,
                 CONNECTION_ATTEMPTS_DOC,
@@ -167,7 +167,7 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
                 CONNECTION_ATTEMPTS_DISPLAY
         ).define(
                 CONNECTION_BACKOFF_CONFIG,
-                Type.STRING,
+                Type.LONG,
                 CONNECTION_BACKOFF_DEFAULT,
                 Importance.LOW,
                 CONNECTION_BACKOFF_DOC,
@@ -226,7 +226,7 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
         int orderInGroup = 0;
         config.define(
                 POLL_INTERVAL_MS_CONFIG,
-                Type.STRING,
+                Type.LONG,
                 POLL_INTERVAL_MS_DEFAULT,
                 Importance.HIGH,
                 POLL_INTERVAL_MS_DOC,
@@ -236,7 +236,7 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
                 POLL_INTERVAL_MS_DISPLAY
         ).define(
                 BATCH_MAX_ROWS_CONFIG,
-                Type.STRING,
+                Type.INT,
                 BATCH_MAX_ROWS_DEFAULT,
                 Importance.LOW,
                 BATCH_MAX_ROWS_DOC,
@@ -257,9 +257,7 @@ public class ElasticSourceConnectorConfig extends AbstractConfig {
     }
 
     public ElasticSourceConnectorConfig(Map<String, String> properties) {
-
         super(CONFIG_DEF, properties);
-
     }
 
     protected ElasticSourceConnectorConfig(ConfigDef subclassConfigDef, Map<String, String> props) {

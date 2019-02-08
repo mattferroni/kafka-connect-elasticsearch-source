@@ -4,6 +4,7 @@ import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
 import com.github.dariobalinzo.elasticsearch.ElasticsearchScrollResponse;
 import com.github.dariobalinzo.schema.SchemaConverter;
 import com.github.dariobalinzo.schema.StructConverter;
+import com.github.dariobalinzo.utils.Utils;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -68,7 +69,7 @@ public class IncrementingIndexQuerier extends IndexQuerier {
 
             Optional<String> firstValueOnIndex = elasticsearchDAO.getFirstValue(indexName, incrementingFieldName);
             if (firstValueOnIndex.isPresent()) {
-                logger.info("Oldest value for field: {} on index: {} is: {}", this.incrementingFieldName, this.indexName, this.incrementingFieldFirstValue);
+                logger.info("Oldest value for field: {} on index: {} is: {}", this.incrementingFieldName, this.indexName, firstValueOnIndex.get());
             } else {
                 logger.warn("Not able to find a value for field: {} on index: {}", this.incrementingFieldName, this.indexName);
             }
@@ -134,8 +135,10 @@ public class IncrementingIndexQuerier extends IndexQuerier {
 
             for (SearchHit hit : hits.getHits()) {
                 final Map<String, Object> documentAsMap = hit.getSourceAsMap();
-                final Map sourcePartition = Collections.singletonMap(ElasticSourceTaskConfig.INDEX, indexName);
-                final Map sourceOffset = Collections.singletonMap(ElasticSourceTaskConfig.POSITION, documentAsMap.get(incrementingFieldName).toString());
+                final Map<String, String> keyMapForOffsetsTopic = Utils.generateKeyForOffsetsTopic(indexName);
+                final Map<String, String> valueMapForOffsetsTopic = Utils.generateValueForOffsetsTopic(
+                        documentAsMap.get(incrementingFieldName).toString()
+                );
 
                 final Schema schema = SchemaConverter.buildSchemaForDocument(documentAsMap, indexName);
                 final Struct struct = StructConverter.buildStructForDocument(documentAsMap, schema);
@@ -145,8 +148,8 @@ public class IncrementingIndexQuerier extends IndexQuerier {
                 final String key = String.join("_", hit.getIndex(), hit.getType(), hit.getId());
 
                 SourceRecord sourceRecord = new SourceRecord(
-                        sourcePartition,
-                        sourceOffset,
+                        keyMapForOffsetsTopic,
+                        valueMapForOffsetsTopic,
                         targetTopic,
                         Schema.STRING_SCHEMA,   // TODO: make key flexible
                         key,

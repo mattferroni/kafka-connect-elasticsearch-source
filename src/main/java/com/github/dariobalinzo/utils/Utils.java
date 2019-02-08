@@ -18,6 +18,7 @@ package com.github.dariobalinzo.utils;
 
 import com.github.dariobalinzo.ElasticSourceConnectorConfig;
 import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
+import com.github.dariobalinzo.task.ElasticSourceTaskConfig;
 import org.elasticsearch.client.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,10 +36,6 @@ public class Utils {
 
     public static final Logger logger = LoggerFactory.getLogger(Utils.class);
 
-    // TODO: fix these to find a better naming
-    public static final String FILENAME_FIELD = "elasticsource-filename-field";
-    public static final String POSITION_FIELD = "elasticsource-position-field";
-
     public static ElasticsearchDAO initElasticsearchDAO(
             final ElasticSourceConnectorConfig config
     ) {
@@ -50,8 +47,6 @@ public class Utils {
 
         final int maxConnectionAttempts = config.getInt(ElasticSourceConnectorConfig.CONNECTION_ATTEMPTS_CONFIG);
         final long connectionRetryBackoff = config.getLong(ElasticSourceConnectorConfig.CONNECTION_BACKOFF_CONFIG);
-
-        final long batchMaxRows = config.getLong(ElasticSourceConnectorConfig.BATCH_MAX_ROWS_CONFIG);
 
         final ElasticsearchDAO elasticConnectionProvider;
         if (esUser == null || esUser.isEmpty()) {
@@ -74,15 +69,19 @@ public class Utils {
         return elasticConnectionProvider;
     }
 
-    private Map<String, String> offsetKey(String filename) {
-        return Collections.singletonMap(FILENAME_FIELD, filename);
+    public static Map<String, String> generateKeyForOffsetsTopic(String indexName) {
+        return Collections.singletonMap(
+                ElasticSourceTaskConfig.KEY_FOR_OFFSETS_KEY,
+                indexName
+        );
     }
 
-    private Map<String, Long> offsetValue(Long pos) {
-        return Collections.singletonMap(POSITION_FIELD, pos);
+    public static Map<String, String> generateValueForOffsetsTopic(String incrementingFieldLastValue) {
+        return Collections.singletonMap(
+                ElasticSourceTaskConfig.KEY_FOR_OFFSETS_VALUE,
+                incrementingFieldLastValue
+        );
     }
-
-
 
     // Not all elastic names are valid avro name
     public static String sanitizeName(String fieldName) {

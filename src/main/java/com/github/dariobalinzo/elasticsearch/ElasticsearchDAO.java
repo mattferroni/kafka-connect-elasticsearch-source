@@ -22,6 +22,7 @@ import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.elasticsearch.ElasticsearchStatusException;
+import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.search.*;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
@@ -253,7 +254,7 @@ public class ElasticsearchDAO {
         });
 
         final ElasticsearchScrollResponse response = new ElasticsearchScrollResponse(searchResponse.getHits(), searchResponse.getScrollId());
-        logger.info("ElasticsearchScrollResponse: {}", response);
+        logger.debug("ElasticsearchScrollResponse: {}", response);
         return response;
     }
 
@@ -288,16 +289,26 @@ public class ElasticsearchDAO {
         final ClearScrollRequest clearScrollRequest = new ClearScrollRequest();
         clearScrollRequest.addScrollId(scrollId);
 
-        ClearScrollResponse clearScrollResponse = retryOnFailure(() -> {
-            return client.clearScroll(clearScrollRequest);
-        });
+        client.clearScrollAsync(clearScrollRequest, new ActionListener<ClearScrollResponse>() {
+            @Override
+            public void onResponse(ClearScrollResponse clearScrollResponse) {
+                boolean succeeded = clearScrollResponse != null && clearScrollResponse.isSucceeded();
+                if (succeeded) {
+                    logger.debug("Gracefully closed scroll request with id: {}", scrollId);
+                } else {
+                    logger.warn("Error closing scroll request with id: {} - Full response: {} - Continue anyway...", scrollId, clearScrollResponse);
+                }
+            }
 
-        boolean succeeded = clearScrollResponse != null && clearScrollResponse.isSucceeded();
-        if (succeeded) {
-            logger.debug("Gracefully closed scroll request with id: {}", scrollId);
-        } else {
-            logger.warn("Error closing scroll request with id: {}", scrollId);
-        }
+            @Override
+            public void onFailure(Exception e) {
+                if (e.getMessage().contains("response=HTTP/1.1 200 OK")) {
+                    logger.info("Exception closing scroll request with id: {}, but Elastic responded correctly - Which Elasticsearch version are you targeting?", scrollId);
+                } else {
+                    logger.warn("Error closing scroll request with id: {} - Continue anyway...", scrollId, e);
+                }
+            }
+        });
     }
 
     /**

@@ -5,7 +5,6 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.List;
 
 /**
@@ -31,7 +30,7 @@ abstract class IndexQuerier implements Comparable<IndexQuerier> {
     ) {
         this.elasticsearchDAO = elasticsearchDAO;
         this.indexName = indexName;
-        this.targetTopic = String.join(topicPrefix, "_", indexName);
+        this.targetTopic = String.join("_", topicPrefix, indexName);
         this.lastUpdate = 0;
     }
 
