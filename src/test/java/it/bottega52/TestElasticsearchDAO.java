@@ -1,8 +1,6 @@
-package com.github.dariobalinzo;
+package it.bottega52;
 
-import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
-import junit.framework.TestCase;
-
+/*
 public class TestElasticsearchDAO extends TestCase {
 
     private static final String HOST = "localhost";
@@ -59,6 +57,7 @@ public class TestElasticsearchDAO extends TestCase {
         //list.size();
 
     }
-     */
+
 
 }
+*/

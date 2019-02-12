@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.github.dariobalinzo.task;
+package it.bottega52.task;
 
-import com.github.dariobalinzo.ElasticSourceConnectorConfig;
-import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
-import com.github.dariobalinzo.utils.Utils;
-import com.github.dariobalinzo.utils.Version;
+import it.bottega52.ElasticSourceConnectorConfig;
+import it.bottega52.elasticsearch.ElasticsearchDAO;
+import it.bottega52.utils.Utils;
+import it.bottega52.utils.Version;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.common.utils.Time;

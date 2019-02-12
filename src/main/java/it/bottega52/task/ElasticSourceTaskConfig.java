@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.github.dariobalinzo.task;
+package it.bottega52.task;
 
 
-import com.github.dariobalinzo.ElasticSourceConnectorConfig;
+import it.bottega52.ElasticSourceConnectorConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;

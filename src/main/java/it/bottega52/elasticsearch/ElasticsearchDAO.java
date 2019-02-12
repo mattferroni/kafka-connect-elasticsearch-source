@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.github.dariobalinzo.elasticsearch;
+package it.bottega52.elasticsearch;
 
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;

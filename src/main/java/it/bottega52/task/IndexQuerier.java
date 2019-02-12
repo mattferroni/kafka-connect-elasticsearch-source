@@ -1,6 +1,6 @@
-package com.github.dariobalinzo.task;
+package it.bottega52.task;
 
-import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
+import it.bottega52.elasticsearch.ElasticsearchDAO;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

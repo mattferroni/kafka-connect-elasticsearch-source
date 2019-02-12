@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.github.dariobalinzo.utils;
+package it.bottega52.utils;
 
 public class Version {
 

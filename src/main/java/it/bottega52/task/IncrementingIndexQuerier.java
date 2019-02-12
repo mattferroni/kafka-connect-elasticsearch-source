@@ -1,10 +1,10 @@
-package com.github.dariobalinzo.task;
+package it.bottega52.task;
 
-import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
-import com.github.dariobalinzo.elasticsearch.ElasticsearchScrollResponse;
-import com.github.dariobalinzo.schema.SchemaConverter;
-import com.github.dariobalinzo.schema.StructConverter;
-import com.github.dariobalinzo.utils.Utils;
+import it.bottega52.elasticsearch.ElasticsearchDAO;
+import it.bottega52.elasticsearch.ElasticsearchScrollResponse;
+import it.bottega52.schema.SchemaConverter;
+import it.bottega52.schema.StructConverter;
+import it.bottega52.utils.Utils;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;

@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.github.dariobalinzo.schema;
+package it.bottega52.schema;
 
-import com.github.dariobalinzo.utils.Utils;
+import it.bottega52.utils.Utils;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.slf4j.Logger;

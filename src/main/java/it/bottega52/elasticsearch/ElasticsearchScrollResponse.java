@@ -1,4 +1,4 @@
-package com.github.dariobalinzo.elasticsearch;
+package it.bottega52.elasticsearch;
 
 import org.elasticsearch.search.SearchHits;
 

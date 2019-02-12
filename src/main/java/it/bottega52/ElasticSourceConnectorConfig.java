@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.github.dariobalinzo;
+package it.bottega52;
 
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;

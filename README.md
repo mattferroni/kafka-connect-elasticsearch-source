@@ -12,8 +12,7 @@ Using kafka connect in distributed way, a sample config file to fetch ``metric*`
 
 ```json
 {       "name": "elastic-source",
-    "config": {"connector.class":"com.github.dariobalinzo.ElasticSourceConnector",
-                                "tasks.max": "1",
+    "config": {"connector.class":ElasticSourceConnector          "tasks.max": "1",
                                 "es.host" : "localhost",
                                 "es.port" : "9200",
                                 "index.prefix" : "metric",
