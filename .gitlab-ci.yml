@@ -41,7 +41,7 @@ s3:push-snapshot:
         - cd target
         - echo $MAVEN_VERSION
         - mv kafka-elastic-source-connect-$MAVEN_VERSION-jar-with-dependencies.jar kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
-        - tar Jcf kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz kafka-processors-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
+        - tar Jcf kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
         - s3cmd put kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz s3://bottega52.snapshots --access_key=$AWS_ACCESS_KEY_ID --secret_key=$AWS_SECRET_ACCESS_KEY --signature-v2 -f --disable-multipart --acl-private
     only:
         - develop
@@ -60,7 +60,7 @@ s3:push-release:
         - MAVEN_VERSION=$(mvn -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive  org.codehaus.mojo:exec-maven-plugin:1.3.1:exec)
         - cd target
         - mv kafka-elastic-source-connect-$MAVEN_VERSION-jar-with-dependencies.jar kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
-        - tar Jcf kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz kafka-processors-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
+        - tar Jcf kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
         - s3cmd put kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz s3://bottega52.releases --access_key=$AWS_ACCESS_KEY_ID --secret_key=$AWS_SECRET_ACCESS_KEY --signature-v2 -f --disable-multipart --acl-private
     only:
         - tags
