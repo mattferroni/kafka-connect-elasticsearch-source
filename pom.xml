@@ -13,7 +13,7 @@
     </properties>
 
     <groupId>it.bottega52</groupId>
-    <artifactId>elastic-source-connect</artifactId>
+    <artifactId>kafka-elastic-source-connect</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
 

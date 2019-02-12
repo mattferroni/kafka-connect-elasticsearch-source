@@ -1,0 +1,67 @@
+stages:
+    - build
+    - deploy
+
+mvn:build:
+    image: maven:3.5.2-jdk-8
+    stage: build
+    before_script:
+        - ls
+        - apt-get update -qq && apt-get install -y -qq git
+        - mkdir -p .m2
+        - echo "<settings><servers><server><id>aws-snapshot</id><username>$AWS_ACCESS_KEY_ID_MAVEN</username><password>$AWS_SECRET_ACCESS_KEY_MAVEN</password></server><server><id>aws-release</id><username>$AWS_ACCESS_KEY_ID</username><password>$AWS_SECRET_ACCESS_KEY</password></server></servers></settings>" > .m2/settings.xml
+    variables:
+        MAVEN_OPTS: -Dmaven.repo.local=.m2
+    script:
+        - MESSAGE=$(git log -1 --pretty=%B)
+        - echo $MESSAGE
+        - if [[ $MESSAGE == *"INVALID_CACHE"* ]]; then export INVALID_CACHE="ENABLED";fi
+        - if [ -n "$INVALID_CACHE" ]; then echo "Invalidating cache..."; rm -rf .m2;fi
+        - mvn package -q
+    cache:
+        key: ${CI_BUILD_REF_NAME}
+        paths:
+          - .m2
+    artifacts:
+        paths:
+          - .m2
+        expire_in: 2 weeks
+
+
+s3:push-snapshot:
+    image: bottega52/maven-s3-1.6.1
+    stage: deploy
+    variables:
+        MAVEN_OPTS: -Dmaven.repo.local=.m2
+    before_script:
+        - ls
+    script:
+        - mvn package -q
+        - MAVEN_VERSION=$(mvn -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive  org.codehaus.mojo:exec-maven-plugin:1.3.1:exec)
+        - cd target
+        - echo $MAVEN_VERSION
+        - mv kafka-elastic-source-connect-$MAVEN_VERSION-jar-with-dependencies.jar kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
+        - tar Jcf kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz kafka-processors-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
+        - s3cmd put kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz s3://bottega52.snapshots --access_key=$AWS_ACCESS_KEY_ID --secret_key=$AWS_SECRET_ACCESS_KEY --signature-v2 -f --disable-multipart --acl-private
+    only:
+        - develop
+        - demo
+        - sandbox
+
+s3:push-release:
+    image: bottega52/maven-s3-1.6.1
+    stage: deploy
+    variables:
+        MAVEN_OPTS: -Dmaven.repo.local=.m2
+    before_script:
+        - ls
+    script:
+        - mvn package -q
+        - MAVEN_VERSION=$(mvn -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive  org.codehaus.mojo:exec-maven-plugin:1.3.1:exec)
+        - cd target
+        - mv kafka-elastic-source-connect-$MAVEN_VERSION-jar-with-dependencies.jar kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
+        - tar Jcf kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz kafka-processors-$CI_BUILD_REF_NAME-$MAVEN_VERSION.jar
+        - s3cmd put kafka-elastic-source-connect-$CI_BUILD_REF_NAME-$MAVEN_VERSION.tar.gz s3://bottega52.snapshots --access_key=$AWS_ACCESS_KEY_ID --secret_key=$AWS_SECRET_ACCESS_KEY --signature-v2 -f --disable-multipart --acl-private
+    only:
+        - tags
+
