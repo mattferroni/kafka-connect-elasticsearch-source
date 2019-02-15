@@ -72,6 +72,13 @@
             <version>${log4j.version}</version>
         </dependency>
 
+        <!-- Guava for case format -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>27.0.1-jre</version>
+        </dependency>
+
     </dependencies>
 
 

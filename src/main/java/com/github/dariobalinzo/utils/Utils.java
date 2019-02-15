@@ -19,6 +19,7 @@ package com.github.dariobalinzo.utils;
 import com.github.dariobalinzo.ElasticSourceConnectorConfig;
 import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
 import com.github.dariobalinzo.task.ElasticSourceTaskConfig;
+import com.google.common.base.CaseFormat;
 import org.elasticsearch.client.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,10 +86,28 @@ public class Utils {
 
     // Not all elastic names are valid avro name
     public static String sanitizeName(String fieldName) {
-        return fieldName == null ? null : fieldName.replaceAll("[^a-zA-Z0-9]", "");
+        return fieldName == null ? null : fromSnakeToCamelCase(escapeInvalidChars(fieldName));
     }
 
     public static String sanitizeName(String containerName, String fieldName) {
-        return fieldName == null ? containerName : containerName+fieldName.replaceAll("[^a-zA-Z0-9]", "");
+        return fieldName == null ?
+                sanitizeName(containerName)
+                : fromSnakeToCamelCase(
+                        String.join("_",
+                                escapeInvalidChars(containerName),
+                                escapeInvalidChars(fieldName)));
     }
+
+    public static String fromSnakeToCamelCase(String fieldName) {
+        return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, fieldName);
+    }
+
+    public static String escapeInvalidChars(String fieldName) {
+        return fieldName.replaceAll("[^a-zA-Z0-9_]", "");
+    }
+
+    public static String buildTargetTopicName(String indexPrefix, String indexName) {
+        return indexPrefix.concat(indexName);
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.github.dariobalinzo.task;
 
 import com.github.dariobalinzo.elasticsearch.ElasticsearchDAO;
+import com.github.dariobalinzo.utils.Utils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +31,7 @@ abstract class IndexQuerier implements Comparable<IndexQuerier> {
     ) {
         this.elasticsearchDAO = elasticsearchDAO;
         this.indexName = indexName;
-        this.targetTopic = topicPrefix.concat(indexName);
+        this.targetTopic = Utils.buildTargetTopicName(topicPrefix, indexName);
         this.lastUpdate = 0;
     }
 
