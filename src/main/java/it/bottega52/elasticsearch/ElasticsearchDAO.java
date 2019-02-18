@@ -303,7 +303,7 @@ public class ElasticsearchDAO {
             @Override
             public void onFailure(Exception e) {
                 if (e.getMessage().contains("response=HTTP/1.1 200 OK")) {
-                    logger.info("Exception closing scroll request with id: {}, but Elastic responded correctly - Which Elasticsearch version are you targeting?", scrollId);
+                    logger.debug("Exception closing scroll request with id: {}, but Elastic responded correctly - Which Elasticsearch version are you targeting?", scrollId);
                 } else {
                     logger.warn("Error closing scroll request with id: {} - Continue anyway...", scrollId, e);
                 }
