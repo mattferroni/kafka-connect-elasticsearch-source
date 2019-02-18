@@ -13,7 +13,7 @@
         </Console>
     </Appenders>
     <Loggers>
-        <Logger name="com.github.dariobalinzo" level="debug" additivity="false">
+        <Logger name="it.bottega52" level="debug" additivity="false">
             <AppenderRef ref="Console-Appender"/>
         </Logger>
         <Root level="info">

@@ -17,3 +17,33 @@ derby.log
 __test_database_*
 test.sqlite
 *.db-journal
+
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+
+liquibase.properties
+liquibase-diff-changeLog.xml
+log.jks
